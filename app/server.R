@@ -1,8 +1,8 @@
 library(shiny)
 library(NCBI2R)
 
-known.genes = list(
-	"FTO" = list("chromosome" = 16, start=53737875, end=54148379)
+test.genes = list(
+	"FTO" = list("chromosome" = 16, start=53737875, end=54148379,strand="+",description="blah blah blah")
 )
 
 # Read list of cohorts which is expected to be in tab separated format with two colummns: <cohort.id> <cohort.name>
@@ -21,6 +21,7 @@ cohorts <- cohorts[cohorts$id %in% unique(phenotypes$studyid),]
 renderGeneSelect <- function(set.gene="", set.chromosome="",set.start=1, set.end=1000000) {
   sidebarPanel(
 	  textInput("gene", "Gene:", set.gene),
+	  actionButton("gene.lookup", "Lookup gene"),
       selectInput("chromosome", "Chromosome:", 
                 choices = c(as.character(seq(1,22)),"X","Y","MT"),set.chromosome),
 	  sliderInput("range", "Range:",
@@ -31,7 +32,7 @@ renderGeneSelect <- function(set.gene="", set.chromosome="",set.start=1, set.end
 
 ##
 # Step 2: Adjust selection after choice of gene
-renderGeneAdjust <- function(set.gene="", set.chromosome,set.start, set.end) {
+renderGeneAdjust <- function(set.gene="", set.chromosome,set.start, set.end, strand, description) {
   gene.size <-  set.end-set.start
   min.slider <- ifelse(set.start-gene.size > 0, set.start-gene.size, 0)  
 
@@ -62,11 +63,11 @@ renderSelectCohorts <- function(cohorts,cohorts.selected,gene) {
 # Step 4: Select phenotypes relevant for analysis
 renderSelectPhenotypes <- function(select,select.all.none="") {
 	sidebarPanel(
+		actionButton("select.phenotypes.continue", "Continue"),
 		selectInput("phenotypes.all.none", c("","All","None"), choices=c("","all","none"), selected=select.all.none),
 		checkboxGroupInput("phenotypes", "Select phenotypes:", 
 			choices=names(phenotypes),
-			selected=select),
-		actionButton("select.phenotypes.continue", "Continue")
+			selected=select)
 	)
 }
 
@@ -87,15 +88,61 @@ renderSelectCovariates <- function(set) {
 # Step 6: Select stratification
 # TODO
 
+gene.info <- function(gene) {
+	if (is.null(gene)) {
+		return(try(alittlebitharder))
+	}	
+	cat(paste("gene.info: ", gene, "\n"))
+	lookup.str <- paste0(gene, "[sym]")
+	cat(paste("lookup str: ", lookup.str, "\n"))
+	id <- try(GetIDs(lookup.str))
+	if (class(id) == "try-error") {
+		return(id)
+	} else {
+		cat(paste("got id:", id[1], "\n"))
+		return(try(GetGeneInfo(id[1])))
+	}
+}
+
+
+gene.strand <- function(input) {
+		if (input$gene %in% labels(test.genes)) {
+			test.genes[[input$gene]]$strand
+		} else if (!is.null(input$gene.lookup) && input$gene.lookup != 0) {
+			gi <- isolate({gene.info(input$gene)})
+			if (class(gi)=="try-error") {
+				"NA"
+			} else {
+				gi$ori
+			}
+		}
+}
+
+gene.description <- function(input) {
+		if (input$gene %in% labels(test.genes)) {
+			test.genes[[input$gene]]$description
+		} else if (!is.null(input$gene.lookup) && input$gene.lookup != 0) {
+			gi <- isolate({gene.info(input$gene)})
+			if (class(gi)=="try-error") {
+				"NA"
+			} else {
+				gi$genesummary
+			}
+		}
+}
+
+
+
 # Define server logic
 shinyServer(function(input, output) {
 
-	# This function handles the main control logic of the application
-	# It displays sidebars relevant to the particular stage of input
+	###########################
+	# Display Stage management
+	###########################
+
 	output$panel.controls <- renderUI({
 		if (!is.null(input$select.phenotypes.continue) && input$select.phenotypes.continue != 0) {
-			renderSelectCovariates("")	
-
+		 	 renderSelectCovariates("")
 		# Stage 3: Selection of phenotypes
 		} else if (!is.null(input$select.cohorts.continue) && input$select.cohorts.continue != 0) {
 			if (input$phenotypes.all.none == "all" || (is.null(input$phenotypes) && !identical(input$phenotypes.all.none,"none"))) {
@@ -107,17 +154,25 @@ shinyServer(function(input, output) {
 			}
 		## Stage 2: Selection of cohorts
 		} else if (!is.null(input$gene.select.continue) && input$gene.select.continue != 0) {
-			print(summary)
 			renderSelectCohorts(cohorts$name,cohorts$name,input$gene)
 		## Stage 1: Selection of a gene or region
 		} else if (is.null(input$gene)) {
 			renderGeneSelect()
-		} else if (input$gene %in% labels(known.genes)) {
-			renderGeneAdjust(paste(input$gene),known.genes[[input$gene]]$chromosome,known.genes[[input$gene]]$start,known.genes[[input$gene]]$end)
+		} else if (input$gene %in% labels(test.genes)) {
+				renderGeneAdjust(paste(input$gene),test.genes[[input$gene]]$chromosome,test.genes[[input$gene]]$start,test.genes[[input$gene]]$end,test.genes[[input$gene]]$strand,test.genes[[input$gene]]$description)
+		} else if (!is.null(input$gene.lookup) && input$gene.lookup != 0) {
+			gi <- isolate({gene.info(input$gene)})
+			if (class(gi)=="try-error") {
+				renderGeneSelect(input$gene)
+			} else {
+				renderGeneAdjust(paste(input$gene),gi$chr,gi$GeneLowPoint,gi$GeneHighPoint,gi$ori,gi$genesummary)
+			}
 		} else {
 			renderGeneSelect(input$gene)
 		}
-	}) 
+	})
+
+	#output$panel.controls <- renderUI({panel})
 
 
 	# Create a data frame that contains the number of individuals by phenotype and cohorte 
@@ -142,15 +197,19 @@ shinyServer(function(input, output) {
 	})
 
 	output$mainframe <- renderUI({
+
 		mainPanel(
-				if(!is.null(input$gene.select.continue)) {
+				if(!is.null(input$gene.selected)) {
 					span(
 						h1("Summary"),
 						sidebarPanel(span(
 							h4("Gene:"),
 							h6("Gene name: ",ifelse(is.null(input$gene.selected),"Unknown", input$gene.selected)),
 							h6("Chromosome: ", input$chromosome),
-							h6("Range: ", input$range[[1]],"-",input$range[[2]])))
+							h6("Range: ", input$range[[1]],"-",input$range[[2]]),
+							h6("Strand: ", gene.strand(input)),
+							h6("Description: ", gene.description(input))
+))
 					)
 				} else { span("") }
 				,
