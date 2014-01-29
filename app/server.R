@@ -20,7 +20,6 @@ cohorts <- cohorts[cohorts$id %in% unique(phenotypes$studyid),]
 ##
 # Step 1: Select a gene or a genomic range to be analyzed
 renderGeneSelect <- function(set.gene="", set.chromosome="",set.start=1, set.end=1000000) {
-sidebarPanel(
   sidebarPanel(
 	  textInput("gene", "Gene:", set.gene),
 	  actionButton("gene.lookup", "Lookup gene"),
@@ -29,8 +28,7 @@ sidebarPanel(
 	  sliderInput("range", "Range:",
                 min = set.start, max = set.end, value = c(set.start,set.end)),
 	actionButton("gene.select.continue", "Continue")
-  )
-)
+	)
 }
 
 ##
@@ -51,22 +49,37 @@ renderGeneAdjust <- function(set.gene="", set.chromosome,set.start, set.end, str
 }
 
 
+renderGenePanel <- function(input) {
+	span(
+	if (is.null(input$gene)) {
+		renderGeneSelect()
+	} else if (input$gene %in% labels(test.genes)) {
+		renderGeneAdjust(paste(input$gene),test.genes[[input$gene]]$chromosome,test.genes[[input$gene]]$start,test.genes[[input$gene]]$end,test.genes[[input$gene]]$strand,test.genes[[input$gene]]$description)
+	} else if (!is.null(input$gene.lookup) && input$gene.lookup != 0) {
+		gi <- isolate({gene.info.persist(input$gene)})
+		if (class(gi)=="try-error") {
+			renderGeneSelect(input$gene)
+		} else {
+		renderGeneAdjust(paste(input$gene),gi$chr,gi$GeneLowPoint,gi$GeneHighPoint,gi$ori,gi$genesummary)
+		}
+	} else {
+		renderGeneSelect(input$gene)
+	},
+	renderGeneSummary(input))
+}
+
 ## 
 # Step 3: Select cohorts to perfom analysis in
-renderSelectCohorts <- function(cohorts,cohorts.selected,gene) {
-	sidebarPanel(
-		checkboxGroupInput("cohorts", "Select cohorts:", 
-			choices=cohorts,
-			selected=cohorts.selected),
-		actionButton("select.cohorts.continue", "Continue")
-	)
+renderCohortsPanel <- function(input) {
+	wellPanel(
+		checkboxGroupInput("cohorts", "Select cohorts:",choices=cohorts$name, selected= ifelse(is.null(input$cohorts),cohorts$name,input$cohorts)))
 }
+
 
 ##
 # Step 4: Select phenotypes relevant for analysis
 renderSelectPhenotypes <- function(select,select.all.none="") {
-	sidebarPanel(
-		actionButton("select.phenotypes.continue", "Continue"),
+	wellPanel(
 		selectInput("phenotypes.all.none", c("","All","None"), choices=c("","all","none"), selected=select.all.none),
 		checkboxGroupInput("phenotypes", "Select phenotypes:", 
 			choices=names(phenotypes),
@@ -74,22 +87,60 @@ renderSelectPhenotypes <- function(select,select.all.none="") {
 	)
 }
 
+renderPhenotypePanel <- function(input) {
+	if (input$phenotypes.all.none == "all" || (is.null(input$phenotypes) && !identical(input$phenotypes.all.none,"none"))) {
+		renderSelectPhenotypes(names(phenotypes),"all")
+	} else if (input$phenotypes.all.none == "none") {
+		renderSelectPhenotypes(c(),"none")
+	} else {
+		renderSelectPhenotypes(input$phenotypes,"")
+	}
+}
+
 
 ##
 # Step 5: Select covariates
 renderSelectCovariates <- function(set) {
-	sidebarPanel(
-		actionButton("select.covariates.skip", "Skip (use predefined covariates)"),
-		actionButton("select.covariates.continue", "Continue"),
+	wellPanel(
 		checkboxGroupInput("covariates", "Select covariates:", 
 			choices=names(phenotypes),
 			selected=c())
 	)
 }
 
+renderCovariatesPanel <- function(input) {
+	if (is.null(input$covariates)) {
+		renderSelectCovariates("")
+	} else {
+		renderSelectCovariates(input$covariates)
+	}
+}
+
 ##
 # Step 6: Select stratification
 # TODO
+
+
+### Summary functions
+renderGeneSummary <- function(input) {
+	if(!is.null(input$gene.selected)) {
+		sidebarPanel(span(
+			h4("Gene:"),
+			h6("Gene name: ",ifelse(is.null(input$gene.selected),"Unknown", input$gene.selected)),
+			h6("Chromosome: ", input$chromosome),
+			h6("Range: ", input$range[[1]],"-",input$range[[2]]),
+			h6("Strand: ", isolate({gene.strand(input)})),
+			h6("Description: ", isolate({gene.description(input)}))))
+	} else { span("") }
+}
+
+itemListSummary <- function(items,caption) {
+	sidebarPanel(span(h4(caption), ifelse(is.null(items), p("None selected"), p(paste(items,sep=",")))))
+}
+
+renderCohortSummary <- function(input) { itemListSummary(input$cohorts, "Cohorts:") }
+renderPhenotypeSummary <- function(input) { itemListSummary(input$phenotypes, "Phenotypes:") }
+renderCovariateSummary <- function(input) { itemListSummary(input$covariates, "Covariates:") }
 
 gene.info <- function(gene) {
 	if (is.null(gene)) {
@@ -136,92 +187,21 @@ gene.description <- function(input) {
 		}
 }
 
-
-
 # Define server logic
 shinyServer(function(input, output) {
-
-	###########################
-	# Display Stage management
-	###########################
-
-	output$panel.controls <- renderUI({
-		if (!is.null(input$select.phenotypes.continue) && input$select.phenotypes.continue != 0) {
-		 	 renderSelectCovariates("")
-		# Stage 3: Selection of phenotypes
-		} else if (!is.null(input$select.cohorts.continue) && input$select.cohorts.continue != 0) {
-			if (input$phenotypes.all.none == "all" || (is.null(input$phenotypes) && !identical(input$phenotypes.all.none,"none"))) {
-				renderSelectPhenotypes(names(phenotypes),"all")
-			} else if (input$phenotypes.all.none == "none") {
-				renderSelectPhenotypes(c(),"none")
-			} else {
-				renderSelectPhenotypes(input$phenotypes,"")
-			}
-		## Stage 2: Selection of cohorts
-		} else if (!is.null(input$gene.select.continue) && input$gene.select.continue != 0) {
-			renderSelectCohorts(cohorts$name,cohorts$name,input$gene)
-		## Stage 1: Selection of a gene or region
-		} else if (is.null(input$gene)) {
-			renderGeneSelect()
-		} else if (input$gene %in% labels(test.genes)) {
-				renderGeneAdjust(paste(input$gene),test.genes[[input$gene]]$chromosome,test.genes[[input$gene]]$start,test.genes[[input$gene]]$end,test.genes[[input$gene]]$strand,test.genes[[input$gene]]$description)
-		} else if (!is.null(input$gene.lookup) && input$gene.lookup != 0) {
-			gi <- isolate({gene.info.persist(input$gene)})
-			if (class(gi)=="try-error") {
-				renderGeneSelect(input$gene)
-			} else {
-				renderGeneAdjust(paste(input$gene),gi$chr,gi$GeneLowPoint,gi$GeneHighPoint,gi$ori,gi$genesummary)
-			}
-		} else {
-			renderGeneSelect(input$gene)
-		}
-	})
-
-	#output$panel.controls <- renderUI({panel})
-
 	output$mainframe <- renderUI({
-
 		mainPanel(
-				if(!is.null(input$gene.selected)) {
-					span(
-						h1("Summary"),
-						sidebarPanel(span(
-							h4("Gene:"),
-							h6("Gene name: ",ifelse(is.null(input$gene.selected),"Unknown", input$gene.selected)),
-							h6("Chromosome: ", input$chromosome),
-							h6("Range: ", input$range[[1]],"-",input$range[[2]]),
-							h6("Strand: ", isolate({gene.strand(input)})),
-							h6("Description: ", isolate({gene.description(input)}))
-))
-					)
-				} else { span("") }
-				,
-				if (!is.null(input$select.cohorts.continue)) {  
-					sidebarPanel(span(h4("Cohorts:"), p(paste(input$cohorts,sep=","))))
-				} else { span("") }
-				,
-				if (!is.null(input$select.phenotypes.continue)) {
-					if (!is.null(input$phenotypes)) {
-						sidebarPanel(span(h4("Phenotypes:"), p(paste(sort(input$phenotypes),sep=","))))
-					} else {
-						sidebarPanel(span(h4("Phenotypes:"), p("None selected")))
-					}
-					#sidebarPanel(tableOutput("pheno.cohort.table"))
-					#verbatimTextOutput("pheno.cohort.table")
-				} else { span("") }
-				,
-				if (!is.null(input$select.covariates.continue)) {
-					if (!is.null(input$covariates)) {
-						sidebarPanel(span(h4("Covariates:"), p(paste(sort(input$covariates),sep=","))))
-					} else {
-						sidebarPanel(span(h4("Covariates:"), p("None selected")))
-					}
-				} else { span("") }
-				, 
-				if (!is.null(input$phenotypes) && !is.null(input$covariates)) {
-					tableOutput("pheno.covar.table")
-				} else { span("") }
-
+				tabsetPanel(
+					tabPanel("Gene",renderGenePanel(input)),
+					tabPanel("Cohorts", renderCohortsPanel(input)),
+					tabPanel("Phenotypes", renderPhenotypePanel(input)),
+					tabPanel("Covariates", renderCovariatesPanel(input)),
+					tabPanel("Summary",  
+						renderGeneSummary(input),
+						renderCohortSummary(input),
+						renderPhenotypeSummary(input),	
+						renderCovariateSummary(input))
+				)
 		)
 	})
 })
