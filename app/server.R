@@ -192,10 +192,11 @@ gene.description <- function(input) {
 }
 
 # Define server logic
-shinyServer(function(input, output) {
+shinyServer(function(input, output, session) {
 	output$mainframe <- renderUI({
+		print(isolate({ifelse(is.null(input$toptab), "NULL", input$toptab)}))
 		mainPanel(
-				tabsetPanel(
+				tabsetPanel(id="top",selected=ifelse(is.null(input$top),"Gene",input$top),
 					tabPanel("Gene",renderGenePanel(input)),
 					tabPanel("Cohorts", renderCohortsPanel(input)),
 					tabPanel("Phenotypes", renderPhenotypePanel(input)),
