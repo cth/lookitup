@@ -1,5 +1,6 @@
 library(shiny)
 library(NCBI2R)
+library(memoise)
 
 test.genes = list(
 	"FTO" = list("chromosome" = 16, start=53737875, end=54148379,strand="+",description="blah blah blah")
@@ -19,6 +20,7 @@ cohorts <- cohorts[cohorts$id %in% unique(phenotypes$studyid),]
 ##
 # Step 1: Select a gene or a genomic range to be analyzed
 renderGeneSelect <- function(set.gene="", set.chromosome="",set.start=1, set.end=1000000) {
+sidebarPanel(
   sidebarPanel(
 	  textInput("gene", "Gene:", set.gene),
 	  actionButton("gene.lookup", "Lookup gene"),
@@ -28,6 +30,7 @@ renderGeneSelect <- function(set.gene="", set.chromosome="",set.start=1, set.end
                 min = set.start, max = set.end, value = c(set.start,set.end)),
 	actionButton("gene.select.continue", "Continue")
   )
+)
 }
 
 ##
@@ -90,7 +93,7 @@ renderSelectCovariates <- function(set) {
 
 gene.info <- function(gene) {
 	if (is.null(gene)) {
-		return(try(alittlebitharder))
+		return(try(a.little.bit.harder))
 	}	
 	cat(paste("gene.info: ", gene, "\n"))
 	lookup.str <- paste0(gene, "[sym]")
@@ -104,12 +107,14 @@ gene.info <- function(gene) {
 	}
 }
 
+gene.info.persist <- memoise(gene.info)
+
 
 gene.strand <- function(input) {
 		if (input$gene %in% labels(test.genes)) {
 			test.genes[[input$gene]]$strand
 		} else if (!is.null(input$gene.lookup) && input$gene.lookup != 0) {
-			gi <- isolate({gene.info(input$gene)})
+			gi <- gene.info.persist(input$gene)
 			if (class(gi)=="try-error") {
 				"NA"
 			} else {
@@ -122,7 +127,7 @@ gene.description <- function(input) {
 		if (input$gene %in% labels(test.genes)) {
 			test.genes[[input$gene]]$description
 		} else if (!is.null(input$gene.lookup) && input$gene.lookup != 0) {
-			gi <- isolate({gene.info(input$gene)})
+			gi <- gene.info.persist(input$gene)
 			if (class(gi)=="try-error") {
 				"NA"
 			} else {
@@ -161,7 +166,7 @@ shinyServer(function(input, output) {
 		} else if (input$gene %in% labels(test.genes)) {
 				renderGeneAdjust(paste(input$gene),test.genes[[input$gene]]$chromosome,test.genes[[input$gene]]$start,test.genes[[input$gene]]$end,test.genes[[input$gene]]$strand,test.genes[[input$gene]]$description)
 		} else if (!is.null(input$gene.lookup) && input$gene.lookup != 0) {
-			gi <- isolate({gene.info(input$gene)})
+			gi <- isolate({gene.info.persist(input$gene)})
 			if (class(gi)=="try-error") {
 				renderGeneSelect(input$gene)
 			} else {
@@ -174,28 +179,6 @@ shinyServer(function(input, output) {
 
 	#output$panel.controls <- renderUI({panel})
 
-
-	# Create a data frame that contains the number of individuals by phenotype and cohorte 
-	pheno.cohort.table <- isolate({
-		if (!is.null(input$select.phenotypes.continue)) {  
-			# FIXME: Precalculate instead and subset as needed subset as needed subset as needed 
-			df <- head(sapply(input$cohorts, function(x) {
-				cohort.id <- cohorts[[input$cohorts[x]]]
-				sapply(names(phenotypes), function(y) { 
-					sum(!is.na(phenotypes[phenotypes$studyid==cohort.id,which(colnames(phenotypes)==y)])) 
-				})
-			}))
-			cat(dim(df))
-			renderTable(df)
-		} else {
-			NULL
-		}
-	})
-
-	pheno.covar.table <- reactive({
-			renderTable(data.frame(matrix(nrow=length(input$phenotypes), ncol=length(input$covariates), data=rep(T, length(input$phenotypes) * length(input$covariates)))))
-	})
-
 	output$mainframe <- renderUI({
 
 		mainPanel(
@@ -207,8 +190,8 @@ shinyServer(function(input, output) {
 							h6("Gene name: ",ifelse(is.null(input$gene.selected),"Unknown", input$gene.selected)),
 							h6("Chromosome: ", input$chromosome),
 							h6("Range: ", input$range[[1]],"-",input$range[[2]]),
-							h6("Strand: ", gene.strand(input)),
-							h6("Description: ", gene.description(input))
+							h6("Strand: ", isolate({gene.strand(input)})),
+							h6("Description: ", isolate({gene.description(input)}))
 ))
 					)
 				} else { span("") }
