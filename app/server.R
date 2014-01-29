@@ -135,7 +135,11 @@ renderGeneSummary <- function(input) {
 }
 
 itemListSummary <- function(items,caption) {
-	sidebarPanel(span(h4(caption), ifelse(is.null(items), p("None selected"), p(paste(items,sep=",")))))
+	if (is.null(items)) {	
+		sidebarPanel(span(h4(caption), p("None selected")))
+	} else {
+		sidebarPanel(span(h4(caption), p(paste(items,sep=","))))
+	}
 }
 
 renderCohortSummary <- function(input) { itemListSummary(input$cohorts, "Cohorts:") }
