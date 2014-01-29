@@ -72,7 +72,11 @@ renderGenePanel <- function(input) {
 # Step 3: Select cohorts to perfom analysis in
 renderCohortsPanel <- function(input) {
 	wellPanel(
-		checkboxGroupInput("cohorts", "Select cohorts:",choices=cohorts$name, selected= ifelse(is.null(input$cohorts),cohorts$name,input$cohorts)))
+		if(is.null(input$cohorts)) {
+			checkboxGroupInput("cohorts", "Select cohorts:",choices=cohorts$name, selected=cohorts$name)
+		} else {
+			checkboxGroupInput("cohorts", "Select cohorts:",choices=cohorts$name, selected=input$cohorts)
+		})
 }
 
 
@@ -89,9 +93,9 @@ renderSelectPhenotypes <- function(select,select.all.none="") {
 
 renderPhenotypePanel <- function(input) {
 	if (input$phenotypes.all.none == "all" || (is.null(input$phenotypes) && !identical(input$phenotypes.all.none,"none"))) {
-		renderSelectPhenotypes(names(phenotypes),"all")
+		renderSelectPhenotypes(names(phenotypes),"")
 	} else if (input$phenotypes.all.none == "none") {
-		renderSelectPhenotypes(c(),"none")
+		renderSelectPhenotypes(c(),"")
 	} else {
 		renderSelectPhenotypes(input$phenotypes,"")
 	}
@@ -104,7 +108,7 @@ renderSelectCovariates <- function(set) {
 	wellPanel(
 		checkboxGroupInput("covariates", "Select covariates:", 
 			choices=names(phenotypes),
-			selected=c())
+			selected=set)
 	)
 }
 
@@ -194,7 +198,7 @@ gene.description <- function(input) {
 # Define server logic
 shinyServer(function(input, output, session) {
 	output$mainframe <- renderUI({
-		print(isolate({ifelse(is.null(input$toptab), "NULL", input$toptab)}))
+		print(isolate({ifelse(is.null(input$top), "NULL", input$top)}))
 		mainPanel(
 				tabsetPanel(id="top",selected=ifelse(is.null(input$top),"Gene",input$top),
 					tabPanel("Gene",renderGenePanel(input)),
