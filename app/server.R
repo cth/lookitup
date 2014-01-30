@@ -26,8 +26,7 @@ renderGeneSelect <- function(set.gene="", set.chromosome="",set.start=1, set.end
       selectInput("chromosome", "Chromosome:", 
                 choices = c(as.character(seq(1,22)),"X","Y","MT"),set.chromosome),
 	  sliderInput("range", "Range:",
-                min = set.start, max = set.end, value = c(set.start,set.end)),
-	actionButton("gene.select.continue", "Continue")
+                min = set.start, max = set.end, value = c(set.start,set.end))
 	)
 }
 
@@ -41,10 +40,10 @@ renderGeneAdjust <- function(set.gene="", set.chromosome,set.start, set.end, str
 	  textInput("gene.selected", "Gene:", set.gene),
       selectInput("chromosome", "Chromosome:", 
                 choices = set.chromosome, set.chromosome),
-	  sliderInput("range", "Range:",
-                min = min.slider, max = set.end+gene.size, value = c(set.start,set.end)),
-
-	actionButton("gene.select.continue", "Continue")
+	  sliderInput("range", "Range (gene):",
+                min = min.slider, max = set.end+gene.size, value = c(set.start,set.end))
+#	  sliderInput("range", "Range (analysis):",
+#                min = min.slider, max = set.end+gene.size, value = c(set.start,set.end))
   )
 }
 
