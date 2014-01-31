@@ -7,12 +7,12 @@ test.genes = list(
 )
 
 # Read list of cohorts which is expected to be in tab separated format with two colummns: <cohort.id> <cohort.name>
-cohorts <- read.table("cohorts.txt", head=F)
+cohorts <- read.table("data/cohorts.txt", head=F)
 names(cohorts) <- c("id", "name")
 cohorts$name <- paste(cohorts$name, "(", cohorts$id, ")")
 
 # Read phenotype database
-phenotypes <- read.table("MergedPhenotypes_13dec2013.txt",head=T)
+phenotypes <- read.table("data/MergedPhenotypes_13dec2013.txt",head=T)
 
 # Restrict to cohorts for which we have phenotype information
 cohorts <- cohorts[cohorts$id %in% unique(phenotypes$studyid),]
@@ -21,7 +21,7 @@ cohorts <- cohorts[cohorts$id %in% unique(phenotypes$studyid),]
 # Step 1: Select a gene or a genomic range to be analyzed
 renderGeneSelect <- function(set.gene="", set.chromosome="",set.start=1, set.end=1000000) {
   sidebarPanel(
-	  textInput("gene", "Gene:", set.gene),
+	  textInput("gene", "Gene:"),
 	  actionButton("gene.lookup", "Lookup gene"),
       selectInput("chromosome", "Chromosome:", 
                 choices = c(as.character(seq(1,22)),"X","Y","MT"),set.chromosome),
@@ -32,12 +32,13 @@ renderGeneSelect <- function(set.gene="", set.chromosome="",set.start=1, set.end
 
 ##
 # Step 2: Adjust selection after choice of gene
-renderGeneAdjust <- function(set.gene="", set.chromosome,set.start, set.end, strand, description) {
+renderGeneAdjust <- function(set.gene="", set.chromosome,set.start, set.end, strand, description, input) {
   gene.size <-  set.end-set.start
   min.slider <- ifelse(set.start-gene.size > 0, set.start-gene.size, 0)  
-
+  span(
   sidebarPanel(
 	  textInput("gene.selected", "Gene:", set.gene),
+#	  actionButton(input.gene.lookup, "Lookup gene"),      
       selectInput("chromosome", "Chromosome:", 
                 choices = set.chromosome, set.chromosome),
 	  sliderInput("range", "Range (gene):",
@@ -45,26 +46,54 @@ renderGeneAdjust <- function(set.gene="", set.chromosome,set.start, set.end, str
 #	  sliderInput("range", "Range (analysis):",
 #                min = min.slider, max = set.end+gene.size, value = c(set.start,set.end))
   )
+      ,
+        renderGeneSummary(input)
+      )
+}
+
+renderGeneLookup <- function(input) {
+    if(!is.null(input$gene.lookup) && input$gene.lookup > 0){
+        gi <- isolate({gene.info.persist(input$gene)})
+        if (class(gi)=="try-error") {
+            renderGeneSelect()
+        }
+        else {
+            renderGeneAdjust(paste(input$gene),gi$chr,gi$GeneLowPoint,gi$GeneHighPoint,gi$ori,gi$genesummary,input)
+        }
+        
+    }
+    else{
+        span('')
+    }
 }
 
 
+
+    
 renderGenePanel <- function(input) {
-	span(
-	if (is.null(input$gene)) {
-		renderGeneSelect()
-	} else if (input$gene %in% labels(test.genes)) {
-		renderGeneAdjust(paste(input$gene),test.genes[[input$gene]]$chromosome,test.genes[[input$gene]]$start,test.genes[[input$gene]]$end,test.genes[[input$gene]]$strand,test.genes[[input$gene]]$description)
-	} else if (!is.null(input$gene.lookup) && input$gene.lookup != 0) {
-		gi <- isolate({gene.info.persist(input$gene)})
-		if (class(gi)=="try-error") {
-			renderGeneSelect(input$gene)
-		} else {
+    span(
+        if (!is.null(input$gene.lookup) && input$gene.lookup != 0) {
+            gi <- isolate({gene.info.persist(input$gene)})
+            if (class(gi)=="try-error") {
+                renderGeneSelect(input$gene)
+            }
+            else {
 		renderGeneAdjust(paste(input$gene),gi$chr,gi$GeneLowPoint,gi$GeneHighPoint,gi$ori,gi$genesummary)
-		}
-	} else {
+            }
+	}
+
+        else if (is.null(input$gene)) {
+            renderGeneSelect()
+	}
+        else if (input$gene %in% labels(test.genes)) {
+		renderGeneAdjust(paste(input$gene),test.genes[[input$gene]]$chromosome,test.genes[[input$gene]]$start,test.genes[[input$gene]]$end,test.genes[[input$gene]]$strand,test.genes[[input$gene]]$description)
+	}
+        else {
 		renderGeneSelect(input$gene)
-	},
-	renderGeneSummary(input))
+	}
+        ,
+        renderGeneSummary(input)
+        )
 }
 
 ## 
@@ -126,10 +155,10 @@ renderCovariatesPanel <- function(input) {
 
 ### Summary functions
 renderGeneSummary <- function(input) {
-	if(!is.null(input$gene.selected)) {
+	if(!is.null(input$gene.lookup) && input$gene.lookup > 0) {
 		sidebarPanel(span(
 			h4("Gene:"),
-			h6("Gene name: ",ifelse(is.null(input$gene.selected),"Unknown", input$gene.selected)),
+			h6("Gene name: ",ifelse(is.null(input$gene),"Unknown", input$gene)),
 			h6("Chromosome: ", input$chromosome),
 			h6("Range: ", input$range[[1]],"-",input$range[[2]]),
 			h6("Strand: ", isolate({gene.strand(input)})),
@@ -200,7 +229,16 @@ shinyServer(function(input, output, session) {
 		print(isolate({ifelse(is.null(input$top), "NULL", input$top)}))
 		mainPanel(
 				tabsetPanel(id="top",selected=ifelse(is.null(input$top),"Gene",input$top),
-					tabPanel("Gene",renderGenePanel(input)),
+					tabPanel("Gene",
+                                                 if(is.null(input$gene.lookup)){
+                                                     renderGeneSelect(input)
+                                             }else if(input$gene.lookup == 0){
+                                                 renderGeneSelect(input)
+                                             }else{
+                                                 renderGeneLookup(input)
+                                             }
+#                                                 , renderGenePanel(input)
+                                                 ),             
 					tabPanel("Cohorts", renderCohortsPanel(input)),
 					tabPanel("Phenotypes", renderPhenotypePanel(input)),
 					tabPanel("Covariates", renderCovariatesPanel(input)),
