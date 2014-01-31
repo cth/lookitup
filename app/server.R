@@ -126,7 +126,10 @@ renderSelectPhenotypes <- function(select,select.all.none="") {
 }
 
 renderPhenotypePanel <- function(input) {
-	if (input$phenotypes.all.none == "all" || (is.null(input$phenotypes) && !identical(input$phenotypes.all.none,"none"))) {
+#	if (is.null(input$phenotypes.all.none) && (is.null(input$phenotypes)) {
+#		renderSelectPhenotypes(names(phenotypes),"")
+#	} else if
+	if (input$phenotypes.all.none == "all" || (is.null(input$phenotypes) && !identical(input$phenotypes.all.none,""))) {
 		renderSelectPhenotypes(names(phenotypes),"")
 	} else if (input$phenotypes.all.none == "none") {
 		renderSelectPhenotypes(c(),"")
