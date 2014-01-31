@@ -2,9 +2,13 @@ library(shiny)
 library(NCBI2R)
 library(memoise)
 
+source("boolEditTable.R")
+
 test.genes = list(
 	"FTO" = list("chromosome" = 16, start=53737875, end=54148379,strand="+",description="blah blah blah")
 )
+
+global.session <<- list() 
 
 # Read list of cohorts which is expected to be in tab separated format with two colummns: <cohort.id> <cohort.name>
 cohorts <- read.table("data/cohorts.txt", head=F)
@@ -99,6 +103,7 @@ renderGenePanel <- function(input) {
 ## 
 # Step 3: Select cohorts to perfom analysis in
 renderCohortsPanel <- function(input) {
+
 	wellPanel(
 		if(is.null(input$cohorts)) {
 			checkboxGroupInput("cohorts", "Select cohorts:",choices=cohorts$name, selected=cohorts$name)
@@ -129,23 +134,62 @@ renderPhenotypePanel <- function(input) {
 	}
 }
 
-
 ##
 # Step 5: Select covariates
-renderSelectCovariates <- function(set) {
-	wellPanel(
-		checkboxGroupInput("covariates", "Select covariates:", 
-			choices=names(phenotypes),
-			selected=set)
-	)
-}
-
-renderCovariatesPanel <- function(input) {
-	if (is.null(input$covariates)) {
-		renderSelectCovariates("")
-	} else {
-		renderSelectCovariates(input$covariates)
+renderCovariatesPanel <- function(input,session) {
+	# Add covar button pressed:
+	print(input$add.covar)
+	print(session$add.covar)
+	if (!is.null(input$add.covar) && input$add.covar > 0) {
+		if (!is.null(session$selected.covariates)) {
+			session$selected.covariates <- sort(union(input$select.covar,session$selected.covariates))
+		} else {
+			session$selected.covariates <- input$select.covar
+		}
 	}
+
+	if (!is.null(input$remove.covar) && input$remove.covar > 0) {
+		if (!is.null(session$selected.covariates) && input$select.covar %in% session$selected.covariates) {
+			session$selected.covariates <- setdiff(session$selected.covariates,input$select.covar)
+		}
+	}
+
+
+	print("Rendering covariates tab")
+
+	span(
+	sidebarPanel(
+	  	actionButton("add.covar", "Add"),
+		actionButton("remove.covar", "Remove"),
+		selectInput("select.covar","Covariates:",choices=names(phenotypes))
+	),
+	span(
+		if (length(input$phenotypes) > 0 && length(session$selected.covariates) > 0) {
+			print("Rendering covariate table..")
+			# Create dataframe representing selected phenotypes x selected covariates
+			covar.matrix <- matrix(nrow=length(input$phenotypes),ncol=length(session$selected.covariates),rep(F, length(input$phenotypes) * length(session$selected.covariates)))
+			print("here")
+			print(session$selected.covariates)
+			for(row in input$phenotypes) {
+				for(col in session$selected.covariates) {
+					list.key <- paste0("covar.matrix.",row,".",col)
+					# If this covariate is currently selected in (input) table, then it should keep on being selected
+					if (identical(input[[list.key]],T)) {
+						covar.matrix[which(input$phenotypes==row),which(session$selected.covariates==col)] <- T
+					}
+				}
+			}
+			print("after loop")
+
+			df.covar.matrix <- data.frame(covar.matrix, row.names=input$phenotypes)
+			colnames(df.covar.matrix) <- session$selected.covariates
+			print("just before talbe render")
+			renderEditableBooleanDataframe(df.covar.matrix,"covar.matrix","trait")
+		} else {
+			span("")
+		}
+	)
+	)
 }
 
 ##
@@ -241,11 +285,11 @@ shinyServer(function(input, output, session) {
                                                  ),             
 					tabPanel("Cohorts", renderCohortsPanel(input)),
 					tabPanel("Phenotypes", renderPhenotypePanel(input)),
-					tabPanel("Covariates", renderCovariatesPanel(input)),
+					tabPanel("Covariates", renderCovariatesPanel(input,session)),
 					tabPanel("Summary",  
 						renderGeneSummary(input),
 						renderCohortSummary(input),
-						renderPhenotypeSummary(input),	
+						renderPhenotypeSummary(input),
 						renderCovariateSummary(input))
 				)
 		)
