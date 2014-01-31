@@ -1,30 +1,24 @@
+
 # TODO: I would like to be able to store rownames and column names in the widget, e.g., using hidden inputs, 
 # but I think that some javascript is need to bind these to shiny inputs. 
 
-
-renderEditableBooleanDataframe <- function(dataframe,label="df") {
+# This function renders a table with of check
+renderEditableBooleanDataframe <- function(dataframe,label="df",row.name.name="") {
 	table.rows <- list()
-	row.td <- lapply(c("",names(dataframe)), function(x) { tags$td(tags$strong(x)) })
+	row.td <- lapply(c(row.name.name,names(dataframe)), function(x) { tags$td(tags$strong(x)) })
 	table.rows[[length(table.rows)+1]] <- row.td
-
-	hidden.tags = list() 
-	#for(r in 1:length(names(dataframe))) {
-	#	hidden.tags[[length(hidden.tags)+1]] <- tags$input(type="hidden",id=paste0(label,".col.",r),names(dataframe)[r])
-	#}
-	#for(c in rownames(dataframe)) {
-	#	hidden.tags[[length(hidden.tags)+1]] <- tags$input(type="hidden",id=paste0(label,".row.",c),rownames(dataframe)[c])
-	#}
 
 	for(x in 1:nrow(dataframe)) {
 		row.td <- list()
-		row.td[[length(row.td)+1]] <- tags$td(rownames(dataframe)[x])
+		row <- rownames(dataframe)[x]
+		row.td[[length(row.td)+1]] <- tags$td(row)
 		for (y in 1:ncol(dataframe)) {
-			print(isolate({ paste0(label,".",x,".",y) }))
-			row.td[[length(row.td)+1]] <- tags$td(checkboxInput(paste0(label,".",x,".",y), "", value=dataframe[x,y]))
+			col <- names(dataframe)[y]
+			row.td[[length(row.td)+1]] <- tags$td(checkboxInput(paste0(label,".",row,".",col), "", value=dataframe[x,y]))
 		}
 		table.rows[[length(table.rows)+1]] <- tags$tr(row.td)
 	}
-	list(hidden.tags,tags$table(border="1",table.rows))
+	list(tags$table(border="1",table.rows))
 }
 
 booleanMatrixFromEditTable <- function(input,label,row.names,col.names) {
