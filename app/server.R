@@ -139,9 +139,11 @@ renderPhenotypePanel <- function(input) {
 # Step 5: Select covariates
 renderCovariatesPanel <- function(input,session) {
 	# Add covar button pressed:
-	print(input$add.covar)
-	print(session$add.covar)
-	if (!is.null(input$add.covar) && input$add.covar > 0) {
+	print(paste("input:",input$add.covar))
+	print(paste("session:", session$add.covar))
+	if (!is.null(input$add.covar) && input$add.covar > 0 && !identical(input$add.covar,session$add.covar)) {
+		print("add covar here i am")
+		session$add.covar <- input$add.covar	
 		if (!is.null(session$selected.covariates)) {
 			session$selected.covariates <- sort(union(input$select.covar,session$selected.covariates))
 		} else {
@@ -149,14 +151,15 @@ renderCovariatesPanel <- function(input,session) {
 		}
 	}
 
-	if (!is.null(input$remove.covar) && input$remove.covar > 0) {
+	if (!is.null(input$remove.covar) && input$remove.covar > 0 && !identical(input$remove.covar, session$remove.covar)) {
+		print("rm covar here i am")
+		session$remove.covar <- input$remove.covar
 		if (!is.null(session$selected.covariates) && input$select.covar %in% session$selected.covariates) {
 			session$selected.covariates <- setdiff(session$selected.covariates,input$select.covar)
 		}
 	}
 
-
-	print("Rendering covariates tab")
+	reactive({ renderPhenotypePanel(input) }) 
 
 	span(
 	sidebarPanel(
