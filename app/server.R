@@ -39,6 +39,7 @@ renderGeneSelect <- function(set.gene="", set.chromosome="",set.start=1, set.end
 renderGeneAdjust <- function(set.gene="", set.chromosome,set.start, set.end, strand, description, input) {
   gene.size <-  set.end-set.start
   min.slider <- ifelse(set.start-gene.size > 0, set.start-gene.size, 0)  
+
   span(
   sidebarPanel(
 	  textInput("gene.selected", "Gene:", set.gene),
@@ -192,6 +193,15 @@ renderCovariatesPanel <- function(input,session) {
 	)
 }
 
+renderSummaryPanel <- function(input) {
+	span(
+		renderGeneSummary(input),
+		renderCohortSummary(input),
+		renderPhenotypeSummary(input),
+		renderCovariateSummary(input)
+	)
+}
+
 ##
 # Step 6: Select stratification
 # TODO
@@ -269,29 +279,18 @@ gene.description <- function(input) {
 
 # Define server logic
 shinyServer(function(input, output, session) {
-	output$mainframe <- renderUI({
-		print(isolate({ifelse(is.null(input$top), "NULL", input$top)}))
-		mainPanel(
-				tabsetPanel(id="top",selected=ifelse(is.null(input$top),"Gene",input$top),
-					tabPanel("Gene",
-                                                 if(is.null(input$gene.lookup)){
-                                                     renderGeneSelect(input)
-                                             }else if(input$gene.lookup == 0){
-                                                 renderGeneSelect(input)
-                                             }else{
-                                                 renderGeneLookup(input)
-                                             }
-#                                                 , renderGenePanel(input)
-                                                 ),             
-					tabPanel("Cohorts", renderCohortsPanel(input)),
-					tabPanel("Phenotypes", renderPhenotypePanel(input)),
-					tabPanel("Covariates", renderCovariatesPanel(input,session)),
-					tabPanel("Summary",  
-						renderGeneSummary(input),
-						renderCohortSummary(input),
-						renderPhenotypeSummary(input),
-						renderCovariateSummary(input))
-				)
-		)
+	output$gene.tab <- renderUI({
+    	if(is.null(input$gene.lookup)){
+        	renderGeneSelect(input)
+    	} else if(input$gene.lookup == 0){
+        	renderGeneSelect(input)
+    	} else {
+        	renderGeneLookup(input)
+		}
 	})
+
+	output$cohorts.tab <- renderUI({ renderCohortsPanel(input) })
+	output$phenotypes.tab <- renderUI({ renderPhenotypePanel(input) })
+	output$covariates.tab <- renderUI({ renderCovariatesPanel(input,session) })
+	output$summary.tab <- renderUI({ renderSummaryPanel(input) })
 })
