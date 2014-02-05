@@ -140,13 +140,16 @@ renderPhenotypePanel <- function(input,session) {
 # Step 5: Select covariates
 renderCovariatesPanel <- function(input,session) {
 	if (is.null(input$phenotypes)) {
-		wellPanel(h6("Please select phenotypes in the Phenotypes tab first"))
+		#wellPanel(h6("Please select phenotypes in the Phenotypes tab first"))
+		use.phenotypes <- session$phenotypes
 	} else {
+		use.phenotypes <- input$phenotypes
+	}
 		# Add covar button pressed:
 		#print(paste("input:",input$add.covar))
 		#print(paste("session:", session$add.covar))
 		if (!is.null(input$add.covar) && input$add.covar > 0 && !identical(input$add.covar,session$add.covar)) {
-			session$add.covar <- input$add.covar	
+			session$add.covar <- input$add.covar
 			if (!is.null(session$selected.covariates)) {
 				session$selected.covariates <- sort(union(input$select.covar,session$selected.covariates))
 			} else {
@@ -168,29 +171,35 @@ renderCovariatesPanel <- function(input,session) {
 			selectInput("select.covar","Covariates:",choices=names(phenotypes))
 		),
 		span(
-			if (length(input$phenotypes) > 0 && length(session$selected.covariates) > 0) {
+			if (length(use.phenotypes) > 0 && length(session$selected.covariates) > 0) {
 				# Create dataframe representing selected phenotypes x selected covariates
-				covar.matrix <- matrix(nrow=length(input$phenotypes),ncol=length(session$selected.covariates),rep(F, length(input$phenotypes) * length(session$selected.covariates)))
+				covar.matrix <- matrix(nrow=length(use.phenotypes),ncol=length(session$selected.covariates),rep(F, length(use.phenotypes) * length(session$selected.covariates)))
 				print(session$selected.covariates)
-				for(row in input$phenotypes) {
+				for(row in use.phenotypes) {
 					for(col in session$selected.covariates) {
 						list.key <- paste0("covar.matrix.",row,".",col)
 						# If this covariate is currently selected in (input) table, then it should keep on being selected
-						if (identical(input[[list.key]],T)) {
-							covar.matrix[which(input$phenotypes==row),which(session$selected.covariates==col)] <- T
+						# On the other hand, if the input table have not been displayed yet, then we need to get values 
+						# from session
+						if (is.null(input[[list.key]]) && identical(session[[list.key]],T)) {
+								covar.matrix[which(use.phenotypes==row),which(session$selected.covariates==col)] <- T
+						} else if (identical(input[[list.key]],T)) {
+							covar.matrix[which(use.phenotypes==row),which(session$selected.covariates==col)] <- T
+							session[[list.key]] <- T 
 						}
 					}
 				}
 
-				df.covar.matrix <- data.frame(covar.matrix, row.names=input$phenotypes)
+				df.covar.matrix <- data.frame(covar.matrix, row.names=use.phenotypes)
 				colnames(df.covar.matrix) <- session$selected.covariates
+				session$covariate.matrix <- df.covar.matrix
 				renderEditableBooleanDataframe(df.covar.matrix,"covar.matrix","trait")
 			} else {
 				span("")
 			}
 		)
 		)
-	}
+	#}
 }
 
 renderSummaryPanel <- function(input,session) {
