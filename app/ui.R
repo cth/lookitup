@@ -11,17 +11,18 @@ shinyUI(bootstrapPage(
 	mainPanel(
 		tabsetPanel(id="top",
 			tabPanel("Session", 
-				sidebarPanel(
+				mainPanel(
+				wellPanel(
 					#p(uiOutput("session.status")),
 					uiOutput("session.key"),
 					actionButton("save.session", "Save session"),
-					actionButton("restore.session","Restore session"))
+					actionButton("restore.session","Restore session")),
+					span(h3("Summary of selections:"),uiOutput("summary.tab")))
 			),
 			tabPanel("Gene", uiOutput("gene.tab")),
 			tabPanel("Cohorts", uiOutput("cohorts.tab")),
 			tabPanel("Phenotypes", uiOutput("phenotypes.tab")),
 			tabPanel("Covariates", uiOutput("covariates.tab")),
-			tabPanel("Summary",  uiOutput("summary.tab")),
 			tabPanel("Results", 
 				tabsetPanel(id="results.tabset",
 					tabPanel("test1", h1("test1")),
