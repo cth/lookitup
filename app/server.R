@@ -3,6 +3,7 @@ library(NCBI2R)
 library(memoise)
 
 source("boolEditTable.R")
+source("session.R")
 
 test.genes = list(
 	"FTO" = list("chromosome" = 16, start=53737875, end=54148379,strand="+",description="blah blah blah")
@@ -75,7 +76,7 @@ renderGeneLookup <- function(input) {
 
 
     
-renderGenePanel <- function(input) {
+renderGenePanel <- function(input,session) {
     span(
         if (!is.null(input$gene.lookup) && input$gene.lookup != 0) {
             gi <- isolate({gene.info.persist(input$gene)})
@@ -103,14 +104,12 @@ renderGenePanel <- function(input) {
 
 ## 
 # Step 3: Select cohorts to perfom analysis in
-renderCohortsPanel <- function(input) {
-
-	wellPanel(
-		if(is.null(input$cohorts)) {
-			checkboxGroupInput("cohorts", "Select cohorts:",choices=cohorts$name, selected=cohorts$name)
-		} else {
-			checkboxGroupInput("cohorts", "Select cohorts:",choices=cohorts$name, selected=input$cohorts)
-		})
+renderCohortsPanel <- function(input,session) {
+	if (is.null(input$cohorts)) {
+		wellPanel(checkboxGroupInput("cohorts", "Select cohorts:",choices=cohorts$name, selected=session$cohorts))
+	} else {
+		wellPanel(checkboxGroupInput("cohorts", "Select cohorts:",choices=cohorts$name, selected=input$cohorts))
+	}
 }
 
 
@@ -125,16 +124,15 @@ renderSelectPhenotypes <- function(select,select.all.none="") {
 	)
 }
 
-renderPhenotypePanel <- function(input) {
-#	if (is.null(input$phenotypes.all.none) && (is.null(input$phenotypes)) {
-#		renderSelectPhenotypes(names(phenotypes),"")
-#	} else if
-	if (input$phenotypes.all.none == "all" || (is.null(input$phenotypes) && !identical(input$phenotypes.all.none,""))) {
-		renderSelectPhenotypes(names(phenotypes),"")
-	} else if (input$phenotypes.all.none == "none") {
-		renderSelectPhenotypes(c(),"")
+renderPhenotypePanel <- function(input,session) {
+	if (!is.null(input$phenotypes.all.none) && input$phenotypes.all.none == "all") {
+		renderSelectPhenotypes(names(phenotypes))
+	} else if (is.null(input$phenotypes) && is.null(input$phenotypes.all.none)) {
+		renderSelectPhenotypes(session$phenotypes)
+	} else if (!is.null(input$phenotypes.all.none) && input$phenotypes.all.none == "none") {
+		renderSelectPhenotypes(c())
 	} else {
-		renderSelectPhenotypes(input$phenotypes,"")
+		renderSelectPhenotypes(input$phenotypes)
 	}
 }
 
@@ -195,7 +193,7 @@ renderCovariatesPanel <- function(input,session) {
 	}
 }
 
-renderSummaryPanel <- function(input) {
+renderSummaryPanel <- function(input,session) {
 	span(
 		renderGeneSummary(input),
 		renderCohortSummary(input),
@@ -281,18 +279,58 @@ gene.description <- function(input) {
 
 # Define server logic
 shinyServer(function(input, output, session) {
-	output$gene.tab <- renderUI({
+	# Load session if URL indicates that we should 
+	# When the session.restore button is pushed, a JavaScript is invoked
+	# to reload page with session identifier as part of query URL
+	session <- isolate({
+		queryString <- session$clientData$url_search
+		query <- parseQueryString(queryString)
+		if (!is.null(query$session) && !identical(query$session, session$session.key)) { 
+			print(paste("load session:", query$session))
+			load(paste0(query$session,".session.Rdata"))
+			print(session$cohorts)
+		}
+		session
+	})
+
+	# Initialize session defaults:
+	sessionDefault(session,"cohorts", cohorts$name)
+	sessionDefault(session,"phenotypes", names(phenotypes))
+	
+	# Render tabs
+	output$gene.tab <- reactive({
     	if(is.null(input$gene.lookup)){
-        	renderGeneSelect(input)
+        	renderGeneSelect(input,session)
     	} else if(input$gene.lookup == 0){
-        	renderGeneSelect(input)
+        	renderGeneSelect(input,session)
     	} else {
-        	renderGeneLookup(input)
+        	renderGeneLookup(input,session)
 		}
 	})
 
-	output$cohorts.tab <- renderUI({ renderCohortsPanel(input) })
-	output$phenotypes.tab <- renderUI({ renderPhenotypePanel(input) })
+	output$cohorts.tab <- renderUI({ renderCohortsPanel(input,session) })
+	output$phenotypes.tab <- renderUI({ renderPhenotypePanel(input,session) })
 	output$covariates.tab <- renderUI({ renderCovariatesPanel(input,session) })
 	output$summary.tab <- renderUI({ renderSummaryPanel(input) })
+
+	# Produce session.key and save session as side-effect
+	output$session.key <- renderUI({
+
+		if (!is.null(input$save.session) && input$save.session > 0 && !identical(input$save.session,session$save.session)) {
+
+			# update session with values from input
+			sessionUpdate(session,"cohorts", input$cohorts)
+			sessionUpdate(session,"phenotypes", input$phenotypes)
+
+			print(session$cohorts)
+			session$session.key <- uniqueSessionKey() 
+			print(paste0("Saving session: ",session$session.key))
+			file <- paste0(session$session.key, ".session.Rdata")
+			save(session,file=file)
+		}
+		if (is.null(session$session.key))
+			textInput("session.key","Session identifier:", "")
+		else
+			textInput("session.key","Session identifier:", session$session.key)
+	})
 })
