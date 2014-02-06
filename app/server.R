@@ -1,6 +1,7 @@
 library(shiny)
 library(NCBI2R)
 library(memoise)
+library(rjson)
 
 source("boolEditTable.R")
 source("session.R")
@@ -9,13 +10,19 @@ test.genes = list(
 	"FTO" = list("chromosome" = 16, start=53737875, end=54148379,strand="+",description="blah blah blah")
 )
 
+## Read config file
+config <- fromJSON(file="config.json")
+
 # Read list of cohorts which is expected to be in tab separated format with two colummns: <cohort.id> <cohort.name>
-cohorts <- read.table("data/cohorts.txt", head=F)
+cohorts <- read.table(config$cohorts, head=F)
 names(cohorts) <- c("id", "name")
+
+# FIXME: Small hack to get studyid as part of cohort name
+# This should be thrown out, but we do not have unique cohort names!
 cohorts$name <- paste(cohorts$name, "(", cohorts$id, ")")
 
 # Read phenotype database
-phenotypes <- read.table("data/MergedPhenotypes_13dec2013.txt",head=T)
+phenotypes <- read.table(config$phenotypes,head=T)
 
 # Restrict to cohorts for which we have phenotype information
 cohorts <- cohorts[cohorts$id %in% unique(phenotypes$studyid),]
@@ -336,6 +343,9 @@ shinyServer(function(input, output, session) {
 	output$cohorts.tab <- renderUI({ renderCohortsPanel(input,session) })
 	output$phenotypes.tab <- renderUI({ renderPhenotypePanel(input,session) })
 	output$covariates.tab <- renderUI({ renderCovariatesPanel(input,session) })
+	#output$analysis.tab <- renderUI({ renderAnalysisPanel(input,session) })
+
+
 	output$summary.tab <- renderUI({
 		# update session with values from input
 		sessionUpdate(session,"cohorts", input$cohorts)

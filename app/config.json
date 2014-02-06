@@ -1,0 +1,23 @@
+{
+	"phenotypes": "data/MergedPhenotypes_13dec2013.txt",
+	"cohorts":	"data/cohorts.txt",
+
+	"workers": 
+	[
+			{ 
+				"name":"plink analysis", 
+				"script" : "workers/plink.R",
+				"extension" : ".plink" 
+			},
+			{ 
+				"name": "Annotation analysis", 
+				"script": "workers/annotate.R",
+				"extension": ".annotate"
+			},
+			{
+				"name": "Test stub",
+				"script": "workers/test_stub_worker.R",
+				"extension": ".test"
+			}
+	]
+}
