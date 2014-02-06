@@ -197,7 +197,6 @@ renderCovariatesPanel <- function(input,session) {
 			}
 		)
 		)
-	#}
 }
 
 renderSummaryPanel <- function(input,session) {
@@ -228,18 +227,25 @@ renderGeneSummary <- function(input) {
 }
 
 itemListSummary <- function(items,caption) {
-	wellPanel(
+	wellPanel(span(h4(caption),
 		if (is.null(items)) {	
-			span(h4(caption), p("None selected"))
+			p("None selected")
 		} else {
-			span(h4(caption), p(paste(items,sep=",")))
+			list(tags$ul(lapply(sort(items),function(i) { tags$li(i) } )))
 		}
-	)
+	))
 }
 
 renderCohortSummary <- function(session) { itemListSummary(session$cohorts, "Cohorts:") }
 renderPhenotypeSummary <- function(session) { itemListSummary(session$phenotypes, "Phenotypes:") }
-renderCovariateSummary <- function(session) { itemListSummary(session$covariates, "Covariates:") }
+renderCovariateSummary <- function(session) { 
+#	span(
+#		itemListSummary(session$covariates, "Covariates:"),
+		print(summary(session$covariate.matrix))
+		wellPanel(tableOutput(session$covariate.matrix))
+#	)
+	
+}
 
 gene.info <- function(gene) {
 	if (is.null(gene)) {
@@ -317,10 +323,17 @@ shinyServer(function(input, output, session) {
 		}
 	})
 
+
+	
+
 	output$cohorts.tab <- renderUI({ renderCohortsPanel(input,session) })
 	output$phenotypes.tab <- renderUI({ renderPhenotypePanel(input,session) })
 	output$covariates.tab <- renderUI({ renderCovariatesPanel(input,session) })
-	output$summary.tab <- renderUI({ renderSummaryPanel(input,session) })
+	output$summary.tab <- renderUI({
+		# update session with values from input
+		sessionUpdate(session,"cohorts", input$cohorts)
+		sessionUpdate(session,"phenotypes", input$phenotypes)
+		renderSummaryPanel(input,session) })
 
 	# Produce session.key and save session as side-effect
 	output$session.key <- renderUI({
