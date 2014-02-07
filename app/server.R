@@ -223,7 +223,7 @@ renderAnalysisPanel <- function(input,session) {
 				session$workers[[worker$name]] <- input[[worker$name]]
 
 				if (!is.null(input[[worker$name]]) && identical(input[[worker$name]],T))
-					workerList[[length(workerList)+1]] <- list(tags$strong(worker$name), tags$progress(""))	
+					workerList[[length(workerList)+1]] <- list(tags$strong(worker$name), tags$ul(tags$li(tags$progress(""))))
 				else 
 					workerList[[length(workerList)+1]] <- list(tags$strong(worker$name), tags$ul(tags$li("Skipped.")))
 		}
