@@ -209,6 +209,43 @@ renderCovariatesPanel <- function(input,session) {
 		)
 }
 
+renderAnalysisPanel <- function(input,session) {
+	workerList = list()
+	print(config$workers$name)
+	workers <- c()
+	if ((!is.null(input$run.analysis) && input$run.analysis > 0) || !is.null(session$run.analysis)) {
+		
+		session$session.key <- uniqueSessionKey()
+		workerList[[length(workerList)+1]] <- tags$span(tags$strong("Session ID:"), tags$p(session$session.key))
+
+		session$workers <- list()
+		for(worker in config$workers) {
+				session$workers[[worker$name]] <- input[[worker$name]]
+
+				if (!is.null(input[[worker$name]]) && identical(input[[worker$name]],T))
+					workerList[[length(workerList)+1]] <- list(tags$strong(worker$name), tags$progress(""))	
+				else 
+					workerList[[length(workerList)+1]] <- list(tags$strong(worker$name), tags$ul(tags$li("Skipped.")))
+		}
+
+		session$run.analysis <- input$run.analysis
+		print(paste0("Saving session before analyses: ",session$session.key))
+		file <- paste0(session$session.key, ".session.Rdata")
+		save(session,file=file)
+		file.run <- paste0(session$session.key,".run")
+		write(c(), file=file.run)
+
+	} else {
+		for(worker in config$workers) {
+				workerList[[length(workerList)+1]] <- checkboxInput(worker$name, worker$name, F)
+		}
+		workerList[[length(workerList)+1]] <- actionButton("run.analysis", "Run")
+
+	}
+	#checkboxGroup("workers", choices=workers, selected  
+	wellPanel(workerList)
+}
+
 renderSummaryPanel <- function(input,session) {
 	span(
 		renderGeneSummary(input),
@@ -337,14 +374,10 @@ shinyServer(function(input, output, session) {
 		}
 	})
 
-
-	
-
 	output$cohorts.tab <- renderUI({ renderCohortsPanel(input,session) })
 	output$phenotypes.tab <- renderUI({ renderPhenotypePanel(input,session) })
 	output$covariates.tab <- renderUI({ renderCovariatesPanel(input,session) })
-	#output$analysis.tab <- renderUI({ renderAnalysisPanel(input,session) })
-
+	output$analysis.tab <- renderUI({ renderAnalysisPanel(input,session) })
 
 	output$summary.tab <- renderUI({
 		# update session with values from input
@@ -357,9 +390,14 @@ shinyServer(function(input, output, session) {
 
 		if (!is.null(input$save.session) && input$save.session > 0 && !identical(input$save.session,session$save.session)) {
 
+			# Make sure that any running analyses are not carried over to new session
 			# update session with values from input
 			sessionUpdate(session,"cohorts", input$cohorts)
 			sessionUpdate(session,"phenotypes", input$phenotypes)
+			
+			# Make sure that any running analyses are not carried over to new session
+			session$run.analysis <- NULL
+			session$workers <- NULL
 
 			print(session$cohorts)
 			session$session.key <- uniqueSessionKey() 
