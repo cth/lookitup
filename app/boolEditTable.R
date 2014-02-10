@@ -3,7 +3,7 @@
 # but I think that some javascript is need to bind these to shiny inputs. 
 
 # This function renders a table with of check
-renderEditableBooleanDataframe <- function(dataframe,label="df",row.name.name="") {
+renderBooleanDataframe <- function(dataframe,label="df",row.name.name="",editable=T) {
 	table.rows <- list()
 	row.td <- lapply(c(row.name.name,names(dataframe)), function(x) { tags$td(tags$strong(x)) })
 	table.rows[[length(table.rows)+1]] <- row.td
@@ -14,7 +14,11 @@ renderEditableBooleanDataframe <- function(dataframe,label="df",row.name.name=""
 		row.td[[length(row.td)+1]] <- tags$td(row)
 		for (y in 1:ncol(dataframe)) {
 			col <- names(dataframe)[y]
-			row.td[[length(row.td)+1]] <- tags$td(checkboxInput(paste0(label,".",row,".",col), "", value=dataframe[x,y]))
+			if (editable) {
+				row.td[[length(row.td)+1]] <- tags$td(checkboxInput(paste0(label,".",row,".",col), "", value=dataframe[x,y]))
+			} else {
+				row.td[[length(row.td)+1]] <- tags$td(dataframe[x,y])
+			}
 		}
 		table.rows[[length(table.rows)+1]] <- tags$tr(row.td)
 	}

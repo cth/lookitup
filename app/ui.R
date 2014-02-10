@@ -5,11 +5,25 @@ library(shiny)
 # with stuff. All this happens in server.R
 
 shinyUI(bootstrapPage(
+	tags$head(
+		tags$script(src = "js/session.js")
+	),
 	mainPanel(
 		tabsetPanel(id="top",
+			tabPanel("Session", 
+				mainPanel(
+				wellPanel(
+					#p(uiOutput("session.status")),
+					uiOutput("session.key"),
+					actionButton("save.session", "Save session"),
+					actionButton("restore.session","Restore session")),
+					span(h3("Summary of selections:"),uiOutput("summary.tab")))
+			),
 			tabPanel("Gene", uiOutput("gene.tab")),
 			tabPanel("Cohorts", uiOutput("cohorts.tab")),
 			tabPanel("Phenotypes", uiOutput("phenotypes.tab")),
 			tabPanel("Covariates", uiOutput("covariates.tab")),
-			tabPanel("Summary",  uiOutput("summary.tab"))))))
-
+			tabPanel("Results", 
+				tabsetPanel(id="results.tabset",
+					tabPanel("test1", h1("test1")),
+					tabPanel("test2", h1("test2"))))))))
