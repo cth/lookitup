@@ -36,25 +36,29 @@ renderGeneSelect <- function(set.gene="", set.chromosome="",set.start=1, set.end
 
 ##
 # Step 2: Adjust selection after choice of gene
-renderGeneAdjust <- function(set.gene="", set.chromosome,set.start, set.end, strand, description, input) {
-  gene.size <-  set.end-set.start
-  min.slider <- ifelse(set.start-gene.size > 0, set.start-gene.size, 0)  
-
-  span(
-  sidebarPanel(
-	  textInput("gene.selected", "Gene:", set.gene),
-#	  actionButton(input.gene.lookup, "Lookup gene"),      
-      selectInput("chromosome", "Chromosome:", 
-                choices = set.chromosome, set.chromosome),
-	  sliderInput("range", "Range (gene):",
-                min = min.slider, max = set.end+gene.size, value = c(set.start,set.end))
-#	  sliderInput("range", "Range (analysis):",
-#                min = min.slider, max = set.end+gene.size, value = c(set.start,set.end))
-  )
-      ,
-        renderGeneSummary(input)
-      )
+renderGeneAdjust <- function(set.gene="", set.chromosome="",set.start=1, set.end=1000000, strand="", description="",input,gi=NULL) {
+    
+    gene.size <-  set.end-set.start
+        min.slider <- ifelse(set.start-gene.size > 0, set.start-gene.size, 0)  
+    
+    span(
+        sidebarPanel(
+            textInput("gene.selected", "Gene:", set.gene),
+                                        #	  actionButton(input.gene.lookup, "Lookup gene"),      
+            selectInput("chromosome", "Chromosome:", 
+                        choices = set.chromosome, set.chromosome),
+            sliderInput("range", "Range (gene):",
+                        min = min.slider, max = set.end+gene.size, value = c(set.start,set.end))
+            )
+        ,
+            renderGeneSummary(input)
+        )
 }
+   
+
+   
+   
+
 
 renderGeneLookup <- function(input) {
     if(!is.null(input$gene.lookup) && input$gene.lookup > 0){
