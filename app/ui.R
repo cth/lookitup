@@ -19,7 +19,16 @@ shinyUI(bootstrapPage(
 					actionButton("restore.session","Restore session")),
 					span(h3("Summary of selections:"),uiOutput("summary.tab")))
 			),
-			tabPanel("Gene", uiOutput("gene.tab")),
+			tabPanel("Gene", #uiOutput("gene.tab"),
+                                 sidebarPanel(
+                                     textInput("gene","Gene:"),
+                                     submitButton("Lookup gene")
+                                     ),
+                                 mainPanel(
+                                     h4("Gene Summary:"),
+                                     uiOutput("genePrint")
+                                     ) 
+                                 ),
 			tabPanel("Cohorts", uiOutput("cohorts.tab")),
 			tabPanel("Phenotypes", uiOutput("phenotypes.tab")),
 			tabPanel("Covariates", uiOutput("covariates.tab")),
