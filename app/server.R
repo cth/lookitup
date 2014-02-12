@@ -27,85 +27,6 @@ phenotypes <- read.table(config$phenotypes,head=T)
 # Restrict to cohorts for which we have phenotype information
 cohorts <- cohorts[cohorts$id %in% unique(phenotypes$studyid),]
 
-##
-# Step 1: Select a gene or a genomic range to be analyzed
-renderGeneSelect <- function(set.gene="", set.chromosome="",set.start=1, set.end=1000000) {
-  sidebarPanel(
-	  textInput("gene", "Gene:"),
-	  actionButton("gene.lookup", "Lookup gene"),
-      selectInput("chromosome", "Chromosome:", 
-                choices = c(as.character(seq(1,22)),"X","Y","MT"),set.chromosome),
-	  sliderInput("range", "Range:",
-                min = set.start, max = set.end, value = c(set.start,set.end))
-	)
-}
-
-##
-# Step 2: Adjust selection after choice of gene
-renderGeneAdjust <- function(set.gene="", set.chromosome,set.start, set.end, strand, description, input) {
-  gene.size <-  set.end-set.start
-  min.slider <- ifelse(set.start-gene.size > 0, set.start-gene.size, 0)  
-
-  span(
-  sidebarPanel(
-	  textInput("gene.selected", "Gene:", set.gene),
-#	  actionButton(input.gene.lookup, "Lookup gene"),      
-      selectInput("chromosome", "Chromosome:", 
-                choices = set.chromosome, set.chromosome),
-	  sliderInput("range", "Range (gene):",
-                min = min.slider, max = set.end+gene.size, value = c(set.start,set.end))
-#	  sliderInput("range", "Range (analysis):",
-#                min = min.slider, max = set.end+gene.size, value = c(set.start,set.end))
-  )
-      ,
-        renderGeneSummary(input)
-      )
-}
-
-renderGeneLookup <- function(input) {
-    if(!is.null(input$gene.lookup) && input$gene.lookup > 0){
-        gi <- isolate({gene.info.persist(input$gene)})
-        if (class(gi)=="try-error") {
-            renderGeneSelect()
-        }
-        else {
-            renderGeneAdjust(paste(input$gene),gi$chr,gi$GeneLowPoint,gi$GeneHighPoint,gi$ori,gi$genesummary,input)
-        }
-        
-    }
-    else{
-        span('')
-    }
-}
-
-
-
-    
-renderGenePanel <- function(input,session) {
-    span(
-        if (!is.null(input$gene.lookup) && input$gene.lookup != 0) {
-            gi <- isolate({gene.info.persist(input$gene)})
-            if (class(gi)=="try-error") {
-                renderGeneSelect(input$gene)
-            }
-            else {
-		renderGeneAdjust(paste(input$gene),gi$chr,gi$GeneLowPoint,gi$GeneHighPoint,gi$ori,gi$genesummary)
-            }
-	}
-
-        else if (is.null(input$gene)) {
-            renderGeneSelect()
-	}
-        else if (input$gene %in% labels(test.genes)) {
-		renderGeneAdjust(paste(input$gene),test.genes[[input$gene]]$chromosome,test.genes[[input$gene]]$start,test.genes[[input$gene]]$end,test.genes[[input$gene]]$strand,test.genes[[input$gene]]$description)
-	}
-        else {
-		renderGeneSelect(input$gene)
-	}
-        ,
-        renderGeneSummary(input)
-        )
-}
 
 ## 
 # Step 3: Select cohorts to perfom analysis in
@@ -248,7 +169,7 @@ renderAnalysisPanel <- function(input,session) {
 
 renderSummaryPanel <- function(input,session) {
 	span(
-		renderGeneSummary(input),
+#		renderGeneSummary(input),
 		renderCohortSummary(session),
 		renderPhenotypeSummary(session),
 		renderCovariateSummary(input,session)
@@ -261,16 +182,14 @@ renderSummaryPanel <- function(input,session) {
 
 
 ### Summary functions
-renderGeneSummary <- function(input) {
-	if(!is.null(input$gene.lookup) && input$gene.lookup > 0) {
-		span(
-			h4("Gene:"),
-			h6("Gene name: ",ifelse(is.null(input$gene),"Unknown", input$gene)),
-			h6("Chromosome: ", input$chromosome),
-			h6("Range: ", input$range[[1]],"-",input$range[[2]]),
-			h6("Strand: ", isolate({gene.strand(input)})),
-			h6("Description: ", isolate({gene.description(input)})))
-	} else { span("") }
+renderGeneSummary <- function(geneInputted,gi) {
+    		span(
+			h6("Gene name: ",geneInputted),
+			h6("Chromosome: ", gi$chr),
+			h6("Range: ", gi$GeneLowPoint,"-",gi$GeneHighPoint),
+			h6("Strand: ", gi$ori),
+			h6("Description: ", gi$genesummary)
+                    )
 }
 
 itemListSummary <- function(items,caption) {
@@ -362,18 +281,34 @@ shinyServer(function(input, output, session) {
 	# Initialize session defaults:
 	sessionDefault(session,"cohorts", cohorts$name)
 	sessionDefault(session,"phenotypes", names(phenotypes))
-	
-	# Render tabs
-	output$gene.tab <- reactive({
-    	if(is.null(input$gene.lookup)){
-        	renderGeneSelect(input,session)
-    	} else if(input$gene.lookup == 0){
-        	renderGeneSelect(input,session)
-    	} else {
-        	renderGeneLookup(input,session)
-		}
-	})
 
+       
+
+        
+            
+	# Render tabs   
+        # Render gene tab - fundemental different design by Vincent
+
+        geneInput <- reactive({
+            input$gene
+        })
+
+      
+        output$genePrint <- renderUI({
+            geneInputted <- geneInput()
+            print(geneInputted)
+            gi <- isolate({gene.info.persist(geneInputted)})
+            if (class(gi)=="try-error") {
+                print("Gene not found or servers are down")
+            }
+            else {
+                renderGeneSummary(geneInputted,gi)
+            }
+        })
+
+
+
+        
 	output$cohorts.tab <- renderUI({ renderCohortsPanel(input,session) })
 	output$phenotypes.tab <- renderUI({ renderPhenotypePanel(input,session) })
 	output$covariates.tab <- renderUI({ renderCovariatesPanel(input,session) })
