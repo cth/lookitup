@@ -23,5 +23,7 @@
 
 	"dispatcher": {
 		"worker.type": "local" 
-	}
+	},
+
+	"session.directory": "session/"
 }

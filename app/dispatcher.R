@@ -1,46 +1,10 @@
 #
 # The dispatcher runs in its own process. It is responsible for starting analysis jobs.
 
-library("rjson")
-
-## Read config file
-config <- fromJSON(file="config.json")
-
-session.key <- function(sess.run.file) { 
-	strsplit(basename(sess.run.file),".",fixed=T)[[1]][1]
-}
-
-session.file <- function(sess.key) {
-	paste0("session/",sess.key,".session.Rdata")
-}
-
-
-worker.script <- function(name) {
-	for(w in config$workers) {
-		if (w$name == name)
-			return(w$script)
-	} 
-}
-
-worker.extension <- function(name) {
-	for(w in config$workers) {
-		if (w$name == name)
-			return(w$extension)
-	} 
-}
-
-output.file <- function(sess.key, worker) {
-	paste0("session/", sess.key, ".", worker.extension(worker))
-} 
-
-rscript.qsub <- function(script,name) {
-        qsub.header <- c( "#$ -S /bin/sh", paste("#$ -N", name), "#$ -cwd")
-        write(c(qsub.header, read.delim(file="test.R", header=F, sep="\n",stringsAsFactors=F)$V1), file="tmp.sge", sep="\n")
-        system("qsub tmp.sge")
-}
+source("env.R")
 
 launch.worker <- function(worker,session) {
-	cmdline=paste('Rscript ', worker.script(worker),session.file(session), output.file(session, worker), "&" )
+	cmdline=paste('Rscript ', worker.script(worker),session.file(session), result.file(session, worker), "&" )
 	if (identical(config$dispatcher$worker.type, "local")) {
 		system(cmdline,intern=F)
 	} else if (identical(config$dispatcher$worker.type, "grid")) {
