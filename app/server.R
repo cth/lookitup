@@ -222,17 +222,17 @@ renderAnalysisPanel <- function(input,session) {
 		for(worker in config$workers) {
 				session$workers[[worker$name]] <- input[[worker$name]]
 
-				if (!is.null(input[[worker$name]]) && identical(input[[worker$name]],T))
+				if (!is.null(input[[worker$name]]) && identical(input[[worker$name]],T)) {
 					workerList[[length(workerList)+1]] <- list(tags$strong(worker$name), tags$ul(tags$li(tags$progress(""))))
-				else 
+				} else 
 					workerList[[length(workerList)+1]] <- list(tags$strong(worker$name), tags$ul(tags$li("Skipped.")))
 		}
 
 		session$run.analysis <- input$run.analysis
 		print(paste0("Saving session before analyses: ",session$session.key))
-		file <- paste0(session$session.key, ".session.Rdata")
+		file <- paste0("session/", session$session.key, ".session.Rdata")
 		save(session,file=file)
-		file.run <- paste0(session$session.key,".run")
+		file.run <- paste0("session/",session$session.key,".run")
 		write(c(), file=file.run)
 
 	} else {
@@ -353,7 +353,7 @@ shinyServer(function(input, output, session) {
 		query <- parseQueryString(queryString)
 		if (!is.null(query$session) && !identical(query$session, session$session.key)) { 
 			print(paste("load session:", query$session))
-			load(paste0(query$session,".session.Rdata"))
+			load(paste0("session/", query$session,".session.Rdata"))
 			print(session$cohorts)
 		}
 		session
@@ -402,7 +402,7 @@ shinyServer(function(input, output, session) {
 			print(session$cohorts)
 			session$session.key <- uniqueSessionKey() 
 			print(paste0("Saving session: ",session$session.key))
-			file <- paste0(session$session.key, ".session.Rdata")
+			file <- paste0("session/",session$session.key, ".session.Rdata")
 			save(session,file=file)
 		}
 		if (is.null(session$session.key))
