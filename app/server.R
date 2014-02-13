@@ -276,6 +276,41 @@ gene.description <- function(input) {
 		}
 }
 
+#Lookup logical interpreter
+lookupInterpreter <- function(inputLookup){
+    returnOutput <- data.frame(NA,NA,NA,NA,NA)
+    colnames(returnOutput) <- c('range','summary','name','strand','chr')
+       #range as chr1-22,X,Y:123-456
+    if(grepl(paste0(Reduce(function(...) {paste(...,sep="|") },paste0('chr',1:22)),'chrX|chrY'),inputLookup)){       
+        returnOutput$range <- inputLookup
+        returnOutput$name <- paste0("Range: ",inputLookup)
+    } else if(grepl('rs[0-9]',inputLookup)){ #snp with rs name rs[0-9]
+        returnOutput$range <- "rsnumber looked up and return as range"
+        returnOutput$summary <- "summary of SNP"
+        returnOutput$name <- inputLookup
+        returnOutput$strand <- "strand?!"
+        returnOutput$chr <- 'lolwut'
+    } else {
+            gi <- isolate({gene.info.persist(inputLookup)})
+            if (class(gi)=="try-error") {
+                print("Input not understanded, gene is not found or servers are down")
+                returnOutput$name <- inputLookup
+                returnOutput$summary <- "Input not understanded, gene is not found or servers are down"
+            }
+            else{
+                returnOutput$range <- paste0(gi$chr,gi$GeneLowPoint,'-',gi$GeneHighPoint)
+                returnOutput$name <- inputLookup
+                returnOutput$strand <- gi$ori
+                returnOutput$summary <- gi$genesummary
+                returnOutput$chr <- gi$chr
+            }
+        }
+    return(returnOutput)
+}
+
+
+
+
 # Define server logic
 shinyServer(function(input, output, session) {
 	# Load session if URL indicates that we should 
@@ -303,21 +338,30 @@ shinyServer(function(input, output, session) {
 	# Render tabs   
         # Render gene tab - fundemental different design by Vincent
 
-        geneInput <- reactive({
-            input$gene
-        })
-
       
-        output$genePrint <- renderUI({
-            geneInputted <- geneInput()
-            print(geneInputted)
-            gi <- isolate({gene.info.persist(geneInputted)})
-            if (class(gi)=="try-error") {
-                print("Gene not found or servers are down")
-            }
-            else {
-                renderGeneSummary(geneInputted,gi)
-            }
+        output$lookupPrint <- renderUI({
+            lookupInputted <- input$lookup
+            lookupTranslated <- lookupInterpreter(lookupInputted)
+            print(lookupInputted)
+            
+            span(
+                h6("Name: ",lookupTranslated$name),
+                h6("Chromosome: ", lookupTranslated$chr),
+                h6("Range: ", lookupTranslated$range),
+                h6("Strand: ", lookupTranslated$strand),
+                h6("Description: ", lookupTranslated$summary)
+                )
+
+
+            
+#            print(lookupInputted)
+#            gi <- isolate({gene.info.persist(lookupInputted)})
+#            if (class(gi)=="try-error") {
+#                print("Gene not found or servers are down")
+#            }
+#            else {
+#                renderGeneSummary(lookupInputted,gi)
+#            }
         })
         
 	output$cohorts.tab <- renderUI({ renderCohortsPanel(input,session) })
