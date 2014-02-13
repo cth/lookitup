@@ -7,17 +7,23 @@
 			{ 
 				"name":"plink analysis", 
 				"script" : "workers/plink.R",
-				"extension" : ".plink" 
+				"extension" : "plink" 
 			},
 			{ 
 				"name": "Annotation analysis", 
 				"script": "workers/annotate.R",
-				"extension": ".annotate"
+				"extension": "annotate"
 			},
 			{
 				"name": "Test stub",
 				"script": "workers/test_stub_worker.R",
-				"extension": ".test"
+				"extension": "test"
 			}
-	]
+	],
+
+	"dispatcher": {
+		"worker.type": "local" 
+	},
+
+	"session.directory": "session/"
 }

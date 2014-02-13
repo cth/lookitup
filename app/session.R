@@ -17,7 +17,7 @@ uniqueSessionKey <- function() {
 	repeat {
 		key <- Reduce(function(x,y) { paste0(x,y) }, sample(seq(0,9),20,replace=T))
 		file <- paste0(key,".session.Rdata")
-		if (!file.exists(file))
+		if (!file.exists(session.file(key)))
 			break
 	}
 	print(key)

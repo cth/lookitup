@@ -1,17 +1,14 @@
 library(shiny)
 library(NCBI2R)
 library(memoise)
-library(rjson)
 
-source("boolEditTable.R")
+source("env.R")
 source("session.R")
+source("boolEditTable.R")
 
 test.genes = list(
 	"FTO" = list("chromosome" = 16, start=53737875, end=54148379,strand="+",description="blah blah blah")
 )
-
-## Read config file
-config <- fromJSON(file="config.json")
 
 # Read list of cohorts which is expected to be in tab separated format with two colummns: <cohort.id> <cohort.name>
 cohorts <- read.table(config$cohorts, head=F)
@@ -130,41 +127,60 @@ renderCovariatesPanel <- function(input,session) {
 		)
 }
 
-renderAnalysisPanel <- function(input,session) {
-	workerList = list()
-	print(config$workers$name)
-	workers <- c()
-	if ((!is.null(input$run.analysis) && input$run.analysis > 0) || !is.null(session$run.analysis)) {
-		
-		session$session.key <- uniqueSessionKey()
-		workerList[[length(workerList)+1]] <- tags$span(tags$strong("Session ID:"), tags$p(session$session.key))
+renderAnalysisInput <- function(input,session) {
+		displayElems = list()
+		for(worker in config$workers) {
+				displayElems[[length(displayElems)+1]] <- checkboxInput(worker$name, worker$name, F)
+		}
+		displayElems[[length(displayElems)+1]] <- actionButton("run.analysis", "Run")
 
+		return(displayElems)
+}
+
+renderAnalysisStatus <- function(input,session) {
+	displayElems = list()
+	displayElems[[length(displayElems)+1]] <- tags$span(tags$strong("Session ID:"), tags$p(session$session.key))
+
+	for(worker in config$workers) {
+#j		if ((!is.null(input[[worker$name]]) && identical(input[[worker$name]],T)) {
+# ||
+		if (session$workers[[worker$name]]) {
+			print(paste("result: ",result.file(session$session.key,worker$name)))
+			if (file.exists(result.file(session$session.key,worker$name))) {
+				displayElems[[length(displayElems)+1]] <- 
+					list(tags$strong(worker$name), tags$ul(tags$li("Finished")))
+			} else { # Show "running" progress bar
+				displayElems[[length(displayElems)+1]] <- 
+					list(tags$strong(worker$name), tags$ul(tags$li(tags$progress(""))))
+			}
+		} else {
+			displayElems[[length(displayElems)+1]] <- list(tags$strong(worker$name), tags$ul(tags$li("Skipped.")))
+		}
+	}
+	
+	return(displayElems)
+}
+
+renderAnalysisPanel <- function(input,session) {
+	displayElems = list()
+	print(config$workers$name)
+	if (!is.null(session$run.analysis)) {
+		displayElems <- renderAnalysisStatus(input,session)
+	} else if (!is.null(input$run.analysis) && input$run.analysis > 0) {
+		session$session.key <- uniqueSessionKey()
+		session$run.analysis <- input$run.analysis
 		session$workers <- list()
 		for(worker in config$workers) {
-				session$workers[[worker$name]] <- input[[worker$name]]
-
-				if (!is.null(input[[worker$name]]) && identical(input[[worker$name]],T))
-					workerList[[length(workerList)+1]] <- list(tags$strong(worker$name), tags$progress(""))	
-				else 
-					workerList[[length(workerList)+1]] <- list(tags$strong(worker$name), tags$ul(tags$li("Skipped.")))
+			session$workers[[worker$name]] <- input[[worker$name]]
 		}
-
-		session$run.analysis <- input$run.analysis
 		print(paste0("Saving session before analyses: ",session$session.key))
-		file <- paste0(session$session.key, ".session.Rdata")
-		save(session,file=file)
-		file.run <- paste0(session$session.key,".run")
-		write(c(), file=file.run)
-
+		save(session,file=session.file(session$session.key))
+		write(c(), file=run.file(session$session.key))
+		displayElems <- renderAnalysisStatus(input,session)
 	} else {
-		for(worker in config$workers) {
-				workerList[[length(workerList)+1]] <- checkboxInput(worker$name, worker$name, F)
-		}
-		workerList[[length(workerList)+1]] <- actionButton("run.analysis", "Run")
-
+		displayElems <- renderAnalysisInput(input,session)
 	}
-	#checkboxGroup("workers", choices=workers, selected  
-	wellPanel(workerList)
+	wellPanel(displayElems)
 }
 
 renderSummaryPanel <- function(input,session) {
@@ -307,7 +323,7 @@ shinyServer(function(input, output, session) {
 		query <- parseQueryString(queryString)
 		if (!is.null(query$session) && !identical(query$session, session$session.key)) { 
 			print(paste("load session:", query$session))
-			load(paste0(query$session,".session.Rdata"))
+			load(session.file(query$session))
 			print(session$cohorts)
 		}
 		session
@@ -349,14 +365,12 @@ shinyServer(function(input, output, session) {
 #                renderGeneSummary(lookupInputted,gi)
 #            }
         })
-
-
-
         
 	output$cohorts.tab <- renderUI({ renderCohortsPanel(input,session) })
 	output$phenotypes.tab <- renderUI({ renderPhenotypePanel(input,session) })
 	output$covariates.tab <- renderUI({ renderCovariatesPanel(input,session) })
 	output$analysis.tab <- renderUI({ renderAnalysisPanel(input,session) })
+
 
 	output$summary.tab <- renderUI({
 		# update session with values from input
@@ -381,8 +395,7 @@ shinyServer(function(input, output, session) {
 			print(session$cohorts)
 			session$session.key <- uniqueSessionKey() 
 			print(paste0("Saving session: ",session$session.key))
-			file <- paste0(session$session.key, ".session.Rdata")
-			save(session,file=file)
+			save(session,file=session.file(session$session.key))
 		}
 		if (is.null(session$session.key))
 			textInput("session.key","Session identifier:", "")

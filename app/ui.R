@@ -1,8 +1,9 @@
 library(shiny)
 
 # The UI is mostly dynamically configured from the server-side.
-# In this UI definition, we only setup an empty page to be filled
-# with stuff. All this happens in server.R
+# In this UI definition, we only setup an skeleton page with tabs to be filled
+# with from the server side.. 
+# All this happens from server.R
 
 shinyUI(bootstrapPage(
 	tags$head(
@@ -32,7 +33,8 @@ shinyUI(bootstrapPage(
 			tabPanel("Cohorts", uiOutput("cohorts.tab")),
 			tabPanel("Phenotypes", uiOutput("phenotypes.tab")),
 			tabPanel("Covariates", uiOutput("covariates.tab")),
-			tabPanel("Results", 
-				tabsetPanel(id="results.tabset",
-					tabPanel("test1", h1("test1")),
-					tabPanel("test2", h1("test2"))))))))
+			tabPanel("Analysis", uiOutput("analysis.tab")),
+			tabPanel("Results", uiOutput("results.tab"))))))
+		#		tabsetPanel(id="results.tabset",
+		#			tabPanel("test1", h1("test1")),
+		#			tabPanel("test2", h1("test2"))))))))
