@@ -249,8 +249,18 @@ gene.info <- function(gene) {
 	}
 }
 
-gene.info.persist <- memoise(gene.info)
+snp.info <- function(snp) {
+	if (is.null(snp)) {
+		return(try(a.little.bit.harder))
+	}	
+	return(try( GetSNPInfo(snp) ))
+}
 
+
+
+
+gene.info.persist <- memoise(gene.info)
+snp.info.persist <- memoise(snp.info)
 
 gene.strand <- function(input) {
 		if (input$gene %in% labels(test.genes)) {
@@ -287,11 +297,11 @@ lookupInterpreter <- function(inputLookup){
         returnOutput$range <- inputLookup
         returnOutput$name <- paste0("Range: ",inputLookup)
     } else if(grepl('rs[0-9]',inputLookup)){ #snp with rs name rs[0-9]
-        returnOutput$range <- "rsnumber looked up and return as range"
-        returnOutput$summary <- "summary of SNP"
+        si <- isolate({ snp.info.persist(inputLookup) })
+        returnOutput$range <- paste0('chr',si$chr,':',si$chrpos)
+        returnOutput$summary <- list(tags$ul(tags$li(paste0('Gene symbol: ',si$genesymbol)),tags$li(paste0('Class: ',si$fxn_class)),tags$li(paste0('\nSpecies: ',si$species))))
         returnOutput$name <- inputLookup
-        returnOutput$strand <- "strand?!"
-        returnOutput$chr <- 'lolwut'
+        returnOutput$chr <- si$chr
     } else {
             gi <- isolate({gene.info.persist(inputLookup)})
             if (class(gi)=="try-error") {
