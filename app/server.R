@@ -142,8 +142,6 @@ renderAnalysisStatus <- function(input,session) {
 	displayElems[[length(displayElems)+1]] <- tags$span(tags$strong("Session ID:"), tags$p(session$session.key))
 
 	for(worker in config$workers) {
-#j		if ((!is.null(input[[worker$name]]) && identical(input[[worker$name]],T)) {
-# ||
 		if (session$workers[[worker$name]]) {
 			print(paste("result: ",result.file(session$session.key,worker$name)))
 			if (file.exists(result.file(session$session.key,worker$name))) {
@@ -328,9 +326,41 @@ shinyServer(function(input, output, session) {
 	output$analysis.tab <- renderUI({ renderAnalysisPanel(input,session) })
 
 
+	for (worker in config$workers) {
+		result=data.frame()
+		if (!is.null(session$workers) && session$workers[[worker$name]]) {
+				if (file.exists(result.file(session$session.key,worker))) {
+					load( result.file(session$session.key,worker$name) )
+				}
+		}
+		output[[paste0('table.',worker$name)]] <- renderDataTable({ result }) 
+#data.frame(a=c(1,2,3,4),b=c(3,4,5,6)) }) 
+	}
+	output[['table']] <- renderDataTable({ data.frame(a=c(1,2,3,4),b=c(3,4,5,6)) }) 
+
+	output$results.tab <- renderUI({
+		print("Render result.tab:")
+		tabPanels <- list() 
+		for (worker in config$workers) {
+			print(worker$name)
+			if ( !is.null(session$workers) && session$workers[[worker$name]]) {
+				if (file.exists(result.file(session$session.key,worker))) {
+					#print(dataTableOutput(result))
+					tabPanels[[length(tabPanels)+1]] <- 
+						tabPanel(worker$name, dataTableOutput(paste0("table.",worker$name)))
+				} else {
+					tabPanels[[length(tabPanels)+1]] <- 
+						tabPanel(worker$name, paste(worker$name, "Not finished/run"))
+
+				}
+			}
+		}
+		do.call(tabsetPanel,tabPanels)
+	})
+
+
 	output$summary.tab <- renderUI({
-		# update session with values from input
-		sessionUpdate(session,"cohorts", input$cohorts)
+		# update session with values from input sessionUpdate(session,"cohorts", input$cohorts)
 		sessionUpdate(session,"phenotypes", input$phenotypes)
 		renderSummaryPanel(input,session) })
 
