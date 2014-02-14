@@ -139,11 +139,9 @@ renderAnalysisInput <- function(input,session) {
 
 renderAnalysisStatus <- function(input,session) {
 	displayElems = list()
-	displayElems[[length(displayElems)+1]] <- tags$span(tags$strong("Session ID:"), tags$p(session$session.key))
+	anyRunning <- F
 
 	for(worker in config$workers) {
-#j		if ((!is.null(input[[worker$name]]) && identical(input[[worker$name]],T)) {
-# ||
 		if (session$workers[[worker$name]]) {
 			print(paste("result: ",result.file(session$session.key,worker$name)))
 			if (file.exists(result.file(session$session.key,worker$name))) {
@@ -152,11 +150,15 @@ renderAnalysisStatus <- function(input,session) {
 			} else { # Show "running" progress bar
 				displayElems[[length(displayElems)+1]] <- 
 					list(tags$strong(worker$name), tags$ul(tags$li(tags$progress(""))))
+				anyRunning = T
 			}
 		} else {
 			displayElems[[length(displayElems)+1]] <- list(tags$strong(worker$name), tags$ul(tags$li("Skipped.")))
 		}
 	}
+	
+	if(anyRunning) 
+		displayElems[[length(displayElems)+1]] <- tags$script(paste0("delayedRefreshSession('", session$session.key, "');"))
 	
 	return(displayElems)
 }
@@ -185,7 +187,11 @@ renderAnalysisPanel <- function(input,session) {
 
 renderSummaryPanel <- function(input,session) {
 	span(
-#		renderGeneSummary(input),
+    	if (!is.null(session$run.analysis)) {
+        	wellPanel(renderAnalysisStatus(input,session))
+		} else {
+			span("")
+		},
 		renderCohortSummary(session),
 		renderPhenotypeSummary(session),
 		renderCovariateSummary(input,session)
@@ -439,9 +445,39 @@ shinyServer(function(input, output, session) {
 	output$analysis.tab <- renderUI({ renderAnalysisPanel(input,session) })
 
 
+	for (worker in config$workers) {
+		result=data.frame()
+		if (!is.null(session$workers) && session$workers[[worker$name]]) {
+				if (file.exists(result.file(session$session.key,worker))) {
+					load( result.file(session$session.key,worker$name) )
+				}
+		}
+		output[[paste0('table.',worker$name)]] <- renderDataTable({ result }) 
+	}
+	output[['table']] <- renderDataTable({ data.frame(a=c(1,2,3,4),b=c(3,4,5,6)) }) 
+
+	output$results.tab <- renderUI({
+		print("Render result.tab:")
+		tabPanels <- list() 
+		for (worker in config$workers) {
+			print(worker$name)
+			if ( !is.null(session$workers) && session$workers[[worker$name]]) {
+				if (file.exists(result.file(session$session.key,worker))) {
+					tabPanels[[length(tabPanels)+1]] <- 
+						tabPanel(worker$name, dataTableOutput(paste0("table.",worker$name)))
+				} else {
+					tabPanels[[length(tabPanels)+1]] <- 
+						tabPanel(worker$name, paste(worker$name, span(h3("Analysis not finished yet. Check back later."),tags$progress(""))))
+
+				}
+			}
+		}
+		do.call(tabsetPanel,tabPanels)
+	})
+
+
 	output$summary.tab <- renderUI({
-		# update session with values from input
-		sessionUpdate(session,"cohorts", input$cohorts)
+		# update session with values from input sessionUpdate(session,"cohorts", input$cohorts)
 		sessionUpdate(session,"phenotypes", input$phenotypes)
 		renderSummaryPanel(input,session) })
 
