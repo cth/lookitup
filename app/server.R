@@ -198,9 +198,14 @@ renderSummaryPanel <- function(input,session) {
 	)
 }
 
-##
-# Step 6: Select stratification
-# TODO
+renderInputPanel <- function(input,session) {
+	print(input$input.list)
+	mainPanel(
+		h6("List of genes, SNPS (rsnumbers), and genomic ranges to by analysis (one per line)"),
+		tags$textarea(id="input.list", rows="20", cols="60", "Some text")
+	)
+}
+
 
 
 ### Summary functions
@@ -372,6 +377,7 @@ shinyServer(function(input, output, session) {
 #            }
         })
         
+	output$input.tab <- renderUI({ renderInputPanel(input,session) })
 	output$cohorts.tab <- renderUI({ renderCohortsPanel(input,session) })
 	output$phenotypes.tab <- renderUI({ renderPhenotypePanel(input,session) })
 	output$covariates.tab <- renderUI({ renderCovariatesPanel(input,session) })
