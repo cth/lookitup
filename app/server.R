@@ -351,18 +351,11 @@ renderExploratoriumPanel <- function(input,session){
 drawExploratorium <- function(input,session){
     displayPanel <- list(
         mainPanel(
-#            if(is.null(session$lookup) || session$lookup != input$lookup){
-                textInput("lookup","Search:")
-#            }
-#            else{
-#                textInput("lookup","Search:",session$lookup)
-#            }
-            ,
+            textInput("lookup","Search:"),
             helpText(list("Submit a lookup in one of three formats:",tags$ul(tags$li("Range: chr1:12345-67890"),tags$li("SNP-name: rs1234567890"), tags$li("Gene-name: GENE"))))
             ),
         mainPanel(
-            h4("Modify range:")
-            
+            h4("Modify range:")          
             ),
         mainPanel(
             h4("Summary:")                                    
