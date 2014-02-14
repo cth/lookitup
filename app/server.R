@@ -260,8 +260,18 @@ gene.info <- function(gene) {
 	}
 }
 
-gene.info.persist <- memoise(gene.info)
+snp.info <- function(snp) {
+	if (is.null(snp)) {
+		return(try(a.little.bit.harder))
+	}	
+	return(try( GetSNPInfo(snp) ))
+}
 
+
+
+
+gene.info.persist <- memoise(gene.info)
+snp.info.persist <- memoise(snp.info)
 
 gene.strand <- function(input) {
 		if (input$gene %in% labels(test.genes)) {
@@ -296,22 +306,23 @@ lookupInterpreter <- function(inputLookup){
        #range as chr1-22,X,Y:123-456
     if(grepl(paste0(Reduce(function(...) {paste(...,sep="|") },paste0('chr',1:22)),'chrX|chrY'),inputLookup)){       
         returnOutput$range <- inputLookup
-        returnOutput$name <- paste0("Range: ",inputLookup)
+        chrInputted <- strsplit(inputLookup,":")[[1]][1]
+        returnOutput$chr <- substring(chrInputted,4,nchar(chrInputted))
     } else if(grepl('rs[0-9]',inputLookup)){ #snp with rs name rs[0-9]
-        returnOutput$range <- "rsnumber looked up and return as range"
-        returnOutput$summary <- "summary of SNP"
+        si <- isolate({ snp.info.persist(inputLookup) })
+        returnOutput$range <- paste0('chr',si$chr,':',si$chrpos,"-",si$chrpos)
+        returnOutput$summary <- list(tags$ul(tags$li(paste0('Gene: ',si$genesymbol)),tags$li(paste0('Class: ',si$fxn_class)),tags$li(paste0('\nSpecies: ',si$species))))
         returnOutput$name <- inputLookup
-        returnOutput$strand <- "strand?!"
-        returnOutput$chr <- 'lolwut'
+        returnOutput$chr <- si$chr
     } else {
             gi <- isolate({gene.info.persist(inputLookup)})
             if (class(gi)=="try-error") {
                 print("Input not understanded, gene is not found or servers are down")
                 returnOutput$name <- inputLookup
-                returnOutput$summary <- "Input not understanded, gene is not found or servers are down"
+                returnOutput$summary <- "Input not understanded, not found or servers are down"
             }
             else{
-                returnOutput$range <- paste0(gi$chr,gi$GeneLowPoint,'-',gi$GeneHighPoint)
+                returnOutput$range <- paste0("chr",gi$chr,":",gi$GeneLowPoint,'-',gi$GeneHighPoint)
                 returnOutput$name <- inputLookup
                 returnOutput$strand <- gi$ori
                 returnOutput$summary <- gi$genesummary
@@ -320,6 +331,76 @@ lookupInterpreter <- function(inputLookup){
         }
     return(returnOutput)
 }
+
+
+
+renderExploratoriumPanel <- function(input,session){
+    if(!is.null(session$lookupButton) && session$lookupButton!=input$lookupButton){
+        #update session if it different from input AND is drawn
+        session$lookupButton <- input$lookupButton
+        session$lookup <- input$lookup
+        session$summaryPanel <- summaryExploratorium(input,session)
+        displayPanel <- list(drawExploratorium(input,session),session$summaryPanel)
+    }  else {
+        if(!is.null(session$lookupButton) && session$lookupButton==input$lookupButton){
+            displayPanel <- list(drawExploratorium(input,session),session$summaryPanel)
+        }else{
+            session$lookupButton <- input$lookupButton
+            displayPanel <- drawExploratorium(input,session)
+        }
+    }    
+    return(displayPanel)
+}
+
+
+drawExploratorium <- function(input,session){
+    displayPanel <- list(
+        mainPanel(
+            textInput("lookup","Search:"),
+            helpText(list("Submit a lookup in one of three formats:",tags$ul(tags$li("Range: chr1:12345-67890"),tags$li("SNP-name: rs1234567890"), tags$li("Gene-name: GENE"))))
+            ),
+        mainPanel(
+            h4("Modify range:")          
+            ),
+        mainPanel(
+            h4("Summary:")                                    
+            )
+        )
+    return(displayPanel)
+}
+
+
+summaryExploratorium <- function(input,session) {
+    
+    lookupInputted <- session$lookup
+    lookupTranslated <- lookupInterpreter(lookupInputted)
+    session$range <- lookupTranslated$range
+    displayPanel <- list(
+            h6("Name: ",lookupTranslated$name),
+            h6("Chromosome: ", lookupTranslated$chr),
+            h6("Range: ", lookupTranslated$range),
+            h6("Strand: ", lookupTranslated$strand),
+            h6("Description: ", lookupTranslated$summary)
+       )
+    return(displayPanel)
+
+#        output$lookupModifyRange <- renderUI({
+ #           print(paste("modifyRange",session$range))
+  #          if(is.na(session$range)){
+   #             defaultRange <- "chr1:1-10000"
+    #        }else{
+     #           defaultRange <- paste0(session$range,input$getit)
+      #      }
+       #     span(defaultRange)
+       # })
+
+}
+
+
+
+
+
+
 
 
 
@@ -351,33 +432,11 @@ shinyServer(function(input, output, session) {
 	# Render tabs   
         # Render gene tab - fundemental different design by Vincent
 
-      
-        output$lookupPrint <- renderUI({
-            lookupInputted <- input$lookup
-            lookupTranslated <- lookupInterpreter(lookupInputted)
-            print(lookupInputted)
-            
-            span(
-                h6("Name: ",lookupTranslated$name),
-                h6("Chromosome: ", lookupTranslated$chr),
-                h6("Range: ", lookupTranslated$range),
-                h6("Strand: ", lookupTranslated$strand),
-                h6("Description: ", lookupTranslated$summary)
-                )
+        #Redo as a logical function with uniq function calls
 
-
-            
-#            print(lookupInputted)
-#            gi <- isolate({gene.info.persist(lookupInputted)})
-#            if (class(gi)=="try-error") {
-#                print("Gene not found or servers are down")
-#            }
-#            else {
-#                renderGeneSummary(lookupInputted,gi)
-#            }
-        })
         
 	output$input.tab <- renderUI({ renderInputPanel(input,session) })
+    output$exploratorium.tab <- renderUI({ renderExploratoriumPanel(input,session) })
 	output$cohorts.tab <- renderUI({ renderCohortsPanel(input,session) })
 	output$phenotypes.tab <- renderUI({ renderPhenotypePanel(input,session) })
 	output$covariates.tab <- renderUI({ renderCovariatesPanel(input,session) })
