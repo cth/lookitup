@@ -20,6 +20,7 @@ shinyUI(bootstrapPage(
 					actionButton("restore.session","Restore session")),
 					span(h3("Summary of selections:"),uiOutput("summary.tab")))
 			),
+			tabPanel("Input", uiOutput("input.tab")),
 			tabPanel("Exploratorium", mainPanel(
                             actionButton("lookupButton","Lookup"),
                             uiOutput("exploratorium.tab"))),
@@ -28,6 +29,3 @@ shinyUI(bootstrapPage(
 			tabPanel("Covariates", uiOutput("covariates.tab")),
 			tabPanel("Analysis", uiOutput("analysis.tab")),
 			tabPanel("Results", uiOutput("results.tab"))))))
-		#		tabsetPanel(id="results.tabset",
-		#			tabPanel("test1", h1("test1")),
-		#			tabPanel("test2", h1("test2"))))))))
