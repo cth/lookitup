@@ -320,9 +320,10 @@ lookupInterpreter <- function(inputLookup){
     } else {
             gi <- isolate({gene.info.persist(inputLookup)})
             if (class(gi)=="try-error") {
-                print("Input not understanded, gene is not found or servers are down")
+                print("Input not understood, gene is not found or servers are down")
                 returnOutput$name <- inputLookup
-                returnOutput$summary <- "Input not understanded, not found or servers are down"
+                returnOutput$summary <- "Input not understood, not found or servers are down"
+                returnOutput$type <- 'try-error'
             }
             else{
                 returnOutput$range <- paste0("chr",gi$chr,":",gi$GeneLowPoint,'-',gi$GeneHighPoint)
@@ -342,20 +343,20 @@ renderExploratoriumPanel <- function(input,session){
     #Function that calls the right draw functions at the right time
     if(!is.null(session$lookupButton) && session$lookupButton!=input$lookupButton){
         #update session if it different from input (button is pressed). Update session input and button
-        session$lookupButton <- input$lookupButton
         session$lookup <- input$lookup
-        session$summaryPanel <- summaryExploratorium(input,session)
-        displayPanel <- list(drawExploratorium(input,session),session$summaryPanel)
-    }  else {
-        #Draw the session summary and a new search field if there is a session summary 
-        if(!is.null(session$lookupButton) && session$lookupButton==input$lookupButton){
-            displayPanel <- list(drawExploratorium(input,session),session$summaryPanel)
-        }else{
-            #Draw the search field without a summary and update session button
-            session$lookupButton <- input$lookupButton
-            displayPanel <- drawExploratorium(input,session)
-        }
-    }    
+        session$lookupButton <- input$lookupButton
+        session$ExploratoriumSummaryPanel <- summaryExploratorium(input,session)
+    }
+    #Draw the session summary and a new search field if button have been pressed and updated
+    if(!is.null(session$lookupButton) && session$lookupButton==input$lookupButton){
+        session$ExploratoriumRangePanel <- rangeExploratorium(input,session)
+        displayPanel <- list(drawExploratorium(input,session),session$ExploratoriumRangePanel,session$ExploratoriumSummaryPanel)
+    }else{
+    #Draw the search field without a summary and update session button
+        session$lookupButton <- input$lookupButton
+        displayPanel <- drawExploratorium(input,session)
+    }
+        
     return(displayPanel)
 }
 
@@ -372,33 +373,82 @@ drawExploratorium <- function(input,session){
 }
 
 
+rangeExploratorium <- function(input,session){
+    displayPanel <- list()
+    rangeChosen <- session$range
+
+    if(session$lookupType != 'try-error'){
+        #Original session start and end is used in hack
+        sessionStart <- as.integer(strsplit((strsplit(session$range,":")[[1]][2]),"-")[[1]][1])
+        sessionEnd <- as.integer(strsplit((strsplit(session$range,":")[[1]][2]),"-")[[1]][2])
+        
+        if(!is.null(input$sliderRange) && paste0('chr',session$chr,':',as.character(input$sliderRange[1]),'-',as.character(input$sliderRange[2]))!=rangeChosen){
+            rangeChosen <- paste0('chr',session$chr,':',as.character(input$sliderRange[1]),'-',as.character(input$sliderRange[2]))
+        }
+        
+        rangeStart <- as.integer(strsplit((strsplit(rangeChosen,":")[[1]][2]),"-")[[1]][1])
+        rangeEnd  <- as.integer(strsplit((strsplit(rangeChosen,":")[[1]][2]),"-")[[1]][2])
+        
+        if(rangeStart-1000>0){
+            rangeStartMinus1000 <- rangeStart-1000
+        }else{
+            rangeStartMinus1000 <- 0
+        }
+
+        #Hack to overwrite input if session$range starts or ends outside previous choseable area
+        if( (sessionStart <= rangeStartMinus1000 || sessionStart > rangeEnd ) && (sessionEnd > rangeEnd+1000 || sessionEnd < rangeStart) )
+        {
+            rangeChosen <- session$range
+            rangeStart <- as.integer(strsplit((strsplit(rangeChosen,":")[[1]][2]),"-")[[1]][1])
+            rangeEnd  <- as.integer(strsplit((strsplit(rangeChosen,":")[[1]][2]),"-")[[1]][2])
+            
+            if(rangeStart-1000>0){
+                rangeStartMinus1000 <- rangeStart-1000
+            }else{
+                rangeStartMinus1000 <- 0
+            }
+        }
+      
+
+        if(rangeStart>rangeEnd){
+            session$type <- 'try-error'
+            rangeChosen <- NA
+            displayPanel[[length(displayPanel)+1]] <- list(
+                h4('Impossible range (start>end)!')
+                )
+        }else{
+            displayPanel[[length(displayPanel)+1]] <- list(
+                sliderInput("sliderRange","Modify Range:",min=rangeStartMinus1000, max=rangeEnd+1000,value = c(rangeStart,rangeEnd))
+                )
+            displayPanel[[length(displayPanel)+1]] <- list(
+                h4("Range chosen: ",rangeChosen)
+                )
+        }
+    }
+  
+    if(!is.na(rangeChosen) && session$range != rangeChosen){
+        session$range <- rangeChosen
+    }
+   
+    return(displayPanel)
+}
+
+
+
+
 summaryExploratorium <- function(input,session) {
     #Function that looks up session lookup input and report the summary and draws the modify range slider
     lookupTranslated <- lookupInterpreter(session$lookup)
     session$range <- lookupTranslated$range
-    rangeStart <- as.integer(strsplit((strsplit(session$range,":")[[1]][2]),"-")[[1]][1])
-    rangeEnd  <- as.integer(strsplit((strsplit(session$range,":")[[1]][2]),"-")[[1]][2])
-
-    if(rangeStart-1000>0){
-        rangeStartMinus1000 <- rangeStart-1000
-    }else{
-        rangeStartMinus1000 <- 0
-    }
-    
+    session$lookupType <- lookupTranslated$type
+    session$chr <- lookupTranslated$chr
     displayPanel <- list()
-
-    displayPanel[[length(displayPanel)+1]] <- list(
-        sliderInput("range","Modify Range:",min=rangeStartMinus1000, max=rangeEnd+1000,value = c(rangeStart,rangeEnd))
-             )
-    
-    session$range <- input$range
 
     displayPanel[[length(displayPanel)+1]] <- list(
         h4("Summary:"),
         h6("Name: ",lookupTranslated$name),
         h6("Chromosome: ", lookupTranslated$chr),
         h6("Range: ", lookupTranslated$range),
-#        h6("Range: ", session$range),
         h6("Strand: ", lookupTranslated$strand),
         h6("Description: ", lookupTranslated$summary)
         )
