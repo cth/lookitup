@@ -420,7 +420,7 @@ rangeExploratorium <- function(input,session){
                 sliderInput("sliderRange","Modify Range:",min=rangeStartMinus1000, max=rangeEnd+1000,value = c(rangeStart,rangeEnd))
                 )
             displayPanel[[length(displayPanel)+1]] <- list(
-                h4("Range chosen: ",rangeChosen)
+                h4("Range chosen: ",tags$div(id="range.chosen", rangeChosen))
                 )
         }
     }
