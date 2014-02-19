@@ -25,6 +25,7 @@ shinyUI(bootstrapPage(
 					  	  div(class="span4",
 					    	tags$form(class="well",
 					        actionButton("lookupButton","Lookup"),
+					        actionButton("add.input","Add"),
 					        uiOutput("exploratorium.tab"),
 					        actionButton("addRangeButton","Add Range"))),
 					  	  div(class="span3",

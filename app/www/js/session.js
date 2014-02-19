@@ -14,6 +14,19 @@ $(document).ready(function() {
 			var currentURL = window.location.href.split( '?' );
 			window.location = currentURL[0] + "?session=" + sessionKey;
 		});
+
+
+		$( ":button[id='add.input']" ).on("click", function() {
+			if ($( ":input[id='input.list']").val() == "") {
+				$( ":input[id='input.list']").val( $( ":input[id='lookup']" ).val());
+			} else {
+				$( ":input[id='input.list']").val(  $( ":input[id='input.list']").val() + "\n" +  $( ":input[id='lookup']" ).val());
+
+			}
+	//		$( ":input[id='input.list']").val(  $( ":input[id='input.list']").val() + "\n" +  $( ":input[id='lookup']" ).val());
+	//		alert( $( ":input[id='lookup']").val() );
+		});
     });
 });
+
 
