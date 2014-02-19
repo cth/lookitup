@@ -15,17 +15,25 @@ $(document).ready(function() {
 			window.location = currentURL[0] + "?session=" + sessionKey;
 		});
 
+		function addInput(input) {
+			if ($( ":input[id='input.list']").val() == "") {
+				$( ":input[id='input.list']").val( input );
+			} else {
+				$( ":input[id='input.list']").val(  $( ":input[id='input.list']").val() + "\n" + input);
+			}
+
+		}
+
 
 		$( ":button[id='add.input']" ).on("click", function() {
-			if ($( ":input[id='input.list']").val() == "") {
-				$( ":input[id='input.list']").val( $( ":input[id='lookup']" ).val());
-			} else {
-				$( ":input[id='input.list']").val(  $( ":input[id='input.list']").val() + "\n" +  $( ":input[id='lookup']" ).val());
-
-			}
-	//		$( ":input[id='input.list']").val(  $( ":input[id='input.list']").val() + "\n" +  $( ":input[id='lookup']" ).val());
-	//		alert( $( ":input[id='lookup']").val() );
+			addInput( $( ":input[id='lookup']" ).val() );
 		});
+
+		$( ":button[id='addRangeButton']" ).on("click", function() {
+			addInput( $( "div[id='range.chosen']").text() );
+		});
+
+
     });
 });
 
