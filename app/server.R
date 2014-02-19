@@ -200,9 +200,7 @@ renderSummaryPanel <- function(input,session) {
 
 renderInputPanel <- function(input,session) {
 	print(input$input.list)
-	mainPanel(
-            h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed"),
-            h6("(one per line)"),
+           span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
             tags$textarea(id="input.list", rows="20", cols="60", "")
 	)
 }

@@ -9,23 +9,26 @@ shinyUI(bootstrapPage(
     tags$head(
         tags$script(src = "js/session.js")
         ),
-    sidebarPanel(h4("Exploratorium"),
-        actionButton("lookupButton","Lookup"),
-        uiOutput("exploratorium.tab"),
-        actionButton("addRangeButton","Add Range")
-        ),
     mainPanel(
         tabsetPanel(id="top",
                     tabPanel("Session", 
                              mainPanel(
                                  wellPanel(
-				#p(uiOutput("session.status")),
                                      uiOutput("session.key"),
                                      actionButton("save.session", "Save session"),
                                      actionButton("restore.session","Restore session")),
                                  span(h3("Summary of selections:"),uiOutput("summary.tab")))
                              ),
-                    tabPanel("Input", uiOutput("input.tab")),
+
+                    tabPanel("Input", 
+						span(
+					  	  div(class="span4",
+					    	tags$form(class="well",
+					        actionButton("lookupButton","Lookup"),
+					        uiOutput("exploratorium.tab"),
+					        actionButton("addRangeButton","Add Range"))),
+					  	  div(class="span3",
+							uiOutput("input.tab")))),
                     tabPanel("Cohorts", uiOutput("cohorts.tab")),
                     tabPanel("Phenotypes", uiOutput("phenotypes.tab")),
                     tabPanel("Covariates", uiOutput("covariates.tab")),
