@@ -4,8 +4,9 @@
 source("env.R")
 
 launch.worker <- function(worker,session) {
-	cmdline=paste('Rscript ', worker.script(worker),session.file(session), result.file(session, worker), "&" )
+	cmdline=paste('Rscript ', worker.script(worker),session.file(session), result.file(session), "&" )
 	if (identical(config$dispatcher$worker.type, "local")) {
+		print(cmdline)
 		system(cmdline,intern=F)
 	} else if (identical(config$dispatcher$worker.type, "grid")) {
         qsub <- c( "#$ -S /bin/sh", paste("#$ -N", session), "#$ -cwd", cmdline)
@@ -21,11 +22,7 @@ repeat {
 	for(run in Sys.glob("session/*run")) {
 		file.remove(run)
 		load(session.file(session.key(run)))
-		for(w in names(session$workers)) {
-			if (session$workers[[w]] == T) {
-				launch.worker(w, session.key(run))
-			}
-		}
+		launch.worker(session$select.analysis, session.key(run))
 	} 
 	Sys.sleep(1)
 	cat(".")

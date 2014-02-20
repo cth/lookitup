@@ -1,14 +1,10 @@
 library(shiny)
-library(NCBI2R)
-library(memoise)
+library(rjson)
 
 source("env.R")
 source("session.R")
 source("boolEditTable.R")
-
-test.genes = list(
-	"FTO" = list("chromosome" = 16, start=53737875, end=54148379,strand="+",description="blah blah blah")
-)
+source("lookup.R")
 
 # Read list of cohorts which is expected to be in tab separated format with two colummns: <cohort.id> <cohort.name>
 cohorts <- read.table(config$cohorts, head=F)
@@ -129,9 +125,10 @@ renderCovariatesPanel <- function(input,session) {
 
 renderAnalysisInput <- function(input,session) {
 		displayElems = list()
-		for(worker in config$workers) {
-				displayElems[[length(displayElems)+1]] <- checkboxInput(worker$name, worker$name, F)
-		}
+#		for(worker in config$workers) {
+##				displayElems[[length(displayElems)+1]] <- checkboxInput(worker$name, worker$name, F)
+#		}
+		displayElems[[length(displayElems)+1]] <- radioButtons("select.analysis", "Select analysis:", sapply(config$workers, function(x) { x$name }))
 		displayElems[[length(displayElems)+1]] <- actionButton("run.analysis", "Run")
 
 		return(displayElems)
@@ -139,42 +136,29 @@ renderAnalysisInput <- function(input,session) {
 
 renderAnalysisStatus <- function(input,session) {
 	displayElems = list()
-	anyRunning <- F
 
-	for(worker in config$workers) {
-		if (session$workers[[worker$name]]) {
-			print(paste("result: ",result.file(session$session.key,worker$name)))
-			if (file.exists(result.file(session$session.key,worker$name))) {
-				displayElems[[length(displayElems)+1]] <- 
-					list(tags$strong(worker$name), tags$ul(tags$li("Finished")))
-			} else { # Show "running" progress bar
-				displayElems[[length(displayElems)+1]] <- 
-					list(tags$strong(worker$name), tags$ul(tags$li(tags$progress(""))))
-				anyRunning = T
-			}
-		} else {
-			displayElems[[length(displayElems)+1]] <- list(tags$strong(worker$name), tags$ul(tags$li("Skipped.")))
-		}
+	displayElems[[length(displayElems)+1]] <- list(tags$strong(session$session.key))
+
+	if (file.exists(result.file(session$session.key))) {
+		displayElems[[length(displayElems)+1]] <- 
+			list(tags$strong(session$select.analysis), tags$ul(tags$li("Finished")))
+	} else { # Show "running" progress bar
+		displayElems[[length(displayElems)+1]] <-
+			list(tags$strong(session$select.analysis), tags$ul(tags$li(tags$progress(""))))
+		displayElems[[length(displayElems)+1]] <- tags$script(paste0("delayedrefreshsession('", session$session.key, "');"))
 	}
-	
-	if(anyRunning) 
-		displayElems[[length(displayElems)+1]] <- tags$script(paste0("delayedRefreshSession('", session$session.key, "');"))
-	
+
 	return(displayElems)
 }
 
 renderAnalysisPanel <- function(input,session) {
 	displayElems = list()
-	print(config$workers$name)
 	if (!is.null(session$run.analysis)) {
 		displayElems <- renderAnalysisStatus(input,session)
 	} else if (!is.null(input$run.analysis) && input$run.analysis > 0) {
 		session$session.key <- uniqueSessionKey()
 		session$run.analysis <- input$run.analysis
-		session$workers <- list()
-		for(worker in config$workers) {
-			session$workers[[worker$name]] <- input[[worker$name]]
-		}
+		session$select.analysis <- input$select.analysis
 		print(paste0("Saving session before analyses: ",session$session.key))
 		save(session,file=session.file(session$session.key))
 		write(c(), file=run.file(session$session.key))
@@ -192,6 +176,7 @@ renderSummaryPanel <- function(input,session) {
 		} else {
 			span("")
 		},
+		#renderInputSummary(session),
 		renderCohortSummary(session),
 		renderPhenotypeSummary(session),
 		renderCovariateSummary(input,session)
@@ -199,10 +184,11 @@ renderSummaryPanel <- function(input,session) {
 }
 
 renderInputPanel <- function(input,session) {
-	print(input$input.list)
-           span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
-            tags$textarea(id="input.list", rows="20", cols="60", "")
-	)
+    output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
+            tags$textarea(id="input.list", rows="20", cols="60", ""))
+	session$input.list <- input$input.list
+	print(paste("input.list:", session$input.list))
+	output
 }
 
 
@@ -228,6 +214,14 @@ itemListSummary <- function(items,caption) {
 	))
 }
 
+renderInputSummary <- function(session) { 
+	if (!is.null(session$input.list)) {
+		print("rendering new summary")
+		strsplit(session$input.list,"\n")[[1]]
+		itemListSummary(, "Analysis regions:") 
+	} else
+		span()
+}
 renderCohortSummary <- function(session) { itemListSummary(session$cohorts, "Cohorts:") }
 renderPhenotypeSummary <- function(session) { itemListSummary(session$phenotypes, "Phenotypes:") }
 renderCovariateSummary <- function(input,session) { 
@@ -242,100 +236,6 @@ renderCovariateSummary <- function(input,session) {
 #	)
 	
 }
-
-gene.info <- function(gene) {
-	if (is.null(gene)) {
-		return(try(a.little.bit.harder))
-	}	
-	cat(paste("gene.info: ", gene, "\n"))
-	lookup.str <- paste0(gene, "[sym]")
-	cat(paste("lookup str: ", lookup.str, "\n"))
-	id <- try(GetIDs(lookup.str))
-	if (class(id) == "try-error") {
-		return(id)
-	} else {
-		cat(paste("got id:", id[1], "\n"))
-		return(try(GetGeneInfo(id[1])))
-	}
-}
-
-snp.info <- function(snp) {
-	if (is.null(snp)) {
-		return(try(a.little.bit.harder))
-	}	
-	return(try( GetSNPInfo(snp) ))
-}
-
-
-
-
-gene.info.persist <- memoise(gene.info)
-snp.info.persist <- memoise(snp.info)
-
-gene.strand <- function(input) {
-		if (input$gene %in% labels(test.genes)) {
-			test.genes[[input$gene]]$strand
-		} else if (!is.null(input$gene.lookup) && input$gene.lookup != 0) {
-			gi <- gene.info.persist(input$gene)
-			if (class(gi)=="try-error") {
-				"NA"
-			} else {
-				gi$ori
-			}
-		}
-}
-
-gene.description <- function(input) {
-		if (input$gene %in% labels(test.genes)) {
-			test.genes[[input$gene]]$description
-		} else if (!is.null(input$gene.lookup) && input$gene.lookup != 0) {
-			gi <- gene.info.persist(input$gene)
-			if (class(gi)=="try-error") {
-				"NA"
-			} else {
-				gi$genesummary
-			}
-		}
-}
-
-#Lookup logical interpreter
-lookupInterpreter <- function(inputLookup){
-    #Function that interpret the user input into three types and always output it as range, summary, name, strand, chr and type
-    returnOutput <- data.frame(NA,NA,NA,NA,NA,NA)
-    colnames(returnOutput) <- c('range','summary','name','strand','chr','type') 
-       #range as chr1-22,X,Y:123-456
-    if(grepl(paste0(Reduce(function(...) {paste(...,sep="|") },paste0('chr',1:22)),'chrX|chrY'),inputLookup)){       
-        returnOutput$range <- inputLookup
-        chrInputted <- strsplit(inputLookup,":")[[1]][1]
-        returnOutput$chr <- substring(chrInputted,4,nchar(chrInputted))
-        returnOutput$type <- 'Range'
-    } else if(grepl('rs[0-9]',inputLookup)){ #snp with rs name rs[0-9]
-        si <- isolate({ snp.info.persist(inputLookup) })
-        returnOutput$range <- paste0('chr',si$chr,':',si$chrpos,"-",si$chrpos)
-        returnOutput$summary <- list(tags$ul(tags$li(paste0('Gene: ',si$genesymbol)),tags$li(paste0('Class: ',si$fxn_class)),tags$li(paste0('\nSpecies: ',si$species))))
-        returnOutput$name <- inputLookup
-        returnOutput$chr <- si$chr
-        returnOutput$type <- 'SNP'
-    } else {
-            gi <- isolate({gene.info.persist(inputLookup)})
-            if (class(gi)=="try-error") {
-                print("Input not understood, gene is not found or servers are down")
-                returnOutput$name <- inputLookup
-                returnOutput$summary <- "Input not understood, not found or servers are down"
-                returnOutput$type <- 'try-error'
-            }
-            else{
-                returnOutput$range <- paste0("chr",gi$chr,":",gi$GeneLowPoint,'-',gi$GeneHighPoint)
-                returnOutput$name <- inputLookup
-                returnOutput$strand <- gi$ori
-                returnOutput$summary <- gi$genesummary
-                returnOutput$chr <- gi$chr
-                returnOutput$type <- 'Gene'
-            }
-        }
-    return(returnOutput)
-}
-
 
 
 renderExploratoriumPanel <- function(input,session){
@@ -370,7 +270,6 @@ drawExploratorium <- function(input,session){
         )
     return(displayPanel)
 }
-
 
 rangeExploratorium <- function(input,session){
     displayPanel <- list()
@@ -469,7 +368,6 @@ shinyServer(function(input, output, session) {
 		if (!is.null(query$session) && !identical(query$session, session$session.key)) { 
 			print(paste("load session:", query$session))
 			load(session.file(query$session))
-			print(session$cohorts)
 		}
 		session
 	})
@@ -477,46 +375,27 @@ shinyServer(function(input, output, session) {
 	# Initialize session defaults:
 	sessionDefault(session,"cohorts", cohorts$name)
 	sessionDefault(session,"phenotypes", names(phenotypes))
-
-       
-       
             
 	# Render tabs   
 	output$input.tab <- renderUI({ renderInputPanel(input,session) })
-        output$exploratorium.tab <- renderUI({ renderExploratoriumPanel(input,session) })
+    output$exploratorium.tab <- renderUI({ renderExploratoriumPanel(input,session) })
 	output$cohorts.tab <- renderUI({ renderCohortsPanel(input,session) })
 	output$phenotypes.tab <- renderUI({ renderPhenotypePanel(input,session) })
 	output$covariates.tab <- renderUI({ renderCovariatesPanel(input,session) })
 	output$analysis.tab <- renderUI({ renderAnalysisPanel(input,session) })
 
-
-	for (worker in config$workers) {
-		result=data.frame()
-		if (!is.null(session$workers) && session$workers[[worker$name]]) {
-				if (file.exists(result.file(session$session.key,worker))) {
-					load( result.file(session$session.key,worker$name) )
-				}
+	output$result.table <- renderDataTable({
+		result <- data.frame(a=c("default", "option")) 
+		if (!is.null(session$select.analysis) && file.exists(result.file(session$session.key))) {
+			load(result.file(session$session.key))
 		}
-		output[[paste0('table.',worker$name)]] <- renderDataTable({ result }) 
-	}
-	output[['table']] <- renderDataTable({ data.frame(a=c(1,2,3,4),b=c(3,4,5,6)) }) 
+		result
+	})
 
 	output$results.tab <- renderUI({
 		print("Render result.tab:")
-		tabPanels <- list() 
-		for (worker in config$workers) {
-			print(worker$name)
-			if ( !is.null(session$workers) && session$workers[[worker$name]]) {
-				if (file.exists(result.file(session$session.key,worker))) {
-					tabPanels[[length(tabPanels)+1]] <- 
-						tabPanel(worker$name, dataTableOutput(paste0("table.",worker$name)))
-				} else {
-					tabPanels[[length(tabPanels)+1]] <- 
-						tabPanel(worker$name, paste(worker$name, span(h3("Analysis not finished yet. Check back later."),tags$progress(""))))
-
-				}
-			}
-		}
+		tabPanels <- list(id="result.tabs") 
+		tabPanels[[length(tabPanels)+1]] <-	tabPanel("Table", dataTableOutput("result.table"))
 		do.call(tabsetPanel,tabPanels)
 	})
 

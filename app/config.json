@@ -4,21 +4,25 @@
 
 	"workers": 
 	[
-			{ 
-				"name":"plink analysis", 
-				"script" : "workers/plink.R",
-				"extension" : "plink" 
-			},
-			{ 
-				"name": "Annotation analysis", 
-				"script": "workers/annotate.R",
-				"extension": "annotate"
-			},
-			{
-				"name": "Test stub",
-				"script": "workers/test_stub_worker.R",
-				"extension": "test"
-			}
+
+		{ 
+			"name":"plink analysis", 
+			"script" : "workers/plink_worker.R",
+			"extension" : "plink",
+			"plinkstem" : "../miniplink/thinned-deep",
+			"tmpdir" : "/tmp"
+		},
+		{ 
+			"name": "Annotation analysis", 
+			"script": "workers/annotate.R",
+			"extension": "annotate"
+		},
+		{
+			"name": "Test stub",
+			"script": "workers/test_stub_worker.R",
+			"extension": "test"
+		}
+
 	],
 
 	"dispatcher": {

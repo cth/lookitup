@@ -21,7 +21,8 @@ $(document).ready(function() {
 			} else {
 				$( ":input[id='input.list']").val(  $( ":input[id='input.list']").val() + "\n" + input);
 			}
-
+			// Make sure event listeners react to this
+			$( ":input[id='input.list']").trigger('change');
 		}
 
 

@@ -31,7 +31,10 @@ run.file <- function(sess.key) {
 	paste0(config$session.directory, sess.key, ".run")
 }
 
-result.file <- function(sess.key, worker) {
-	paste0(config$session.directory, sess.key, ".", worker.extension(worker))
+result.file <- function(sess.key) {
+	paste0(config$session.directory, sess.key, ".result")
 } 
 
+#result.file <- function(sess.key, worker) {
+#	paste0(config$session.directory, sess.key, ".", worker.extension(worker))
+#} 
