@@ -1,26 +1,34 @@
 source("worker.common.R")
+source("lookup.R")
 
-# FIXME: 
-temporaryPlinkStem <- function() {
-	"/tmp/plink"
+GenomicRangesToPlinkRangeFile <- function(ranges,file) {
+	df <- as.data.frame(ranges) 
+	fields <- sapply(c("seqnames", "start", "end", "name"),function(x) { which(names(df)==x) })
+	print(fields)
+	write.table(df[,fields],file=file, quot=F, row.names=F, col.names=F,sep="\t")
+	system(paste("cat", file))
 }
 
-plinkExtractRegion(region, plinkfile) {
-	splitRegion <- strsplit(region, ":") 	
-	chr <- substring(splitRegion[[1]],4,nchar(splitRegion[[1]]))
+plinkExtractRegions <- function(regions, plinkStemIn) {
+	# FIXME: use random/unique filename
+	rangesFile <- workerTempFile("plink-ranges") 
+	GenomicRangesToPlinkRangeFile(regions,rangesFile)
 
-	# FIXME: This is human specific and should be configurable
-	if (chr == "X") 
-		chr <- 22
-	else if (chr == "Y") 
-		chr <- 23
+	plinkStemOut <- workerTempFile("plink-stem-")
 
-	splitRange <- strsplit(splitRegion[[2]], "-")
-
-	newPlink <- temporaryPlinkStem()
-
-	cmd <- paste("plink --noweb", "--chr", chr, "--from-kb", splitRange[[1]] / 1000, "--to-kb", splitRange[[2]], "--make-bed --out", newPlink))
+	cmd <- paste("plink --noweb --bfile", plinkStemIn, "--range --extract",  rangesFile,  "--make-bed --out", plinkStemOut)
+	print(cmd)
 	system(cmd)
+
+	return(plinkStemOut)
+}
+
+plinkFrequencies <- function(plinkStemIn) {
+	plink.frq <- workerTempFile("plink.frq.")
+	cmd <- paste("plink --noweb --bfile", plinkStemIn, "--freq --out", plink.frq)
+	print(cmd)
+	system(cmd)
+	return(paste0(plink.frq,".frq"))
 }
 
 worker({
@@ -32,9 +40,19 @@ worker({
 	}
 
 	print(worker.config)
+	print(paste("SESSION: ", session$session.key))
 
-	print(session$session.key)
-	Sys.sleep(10)
-	read.table("workers/test.annotation.txt",head=T)
-	#data.frame(a=c(1,2,3),b=c("a", "b", "c"))
+	# Get input regions from session
+	lookupIdentifiers <- strsplit(session$input.list,"\n")
+
+	ranges <- rangesFromInputList(lookupIdentifiers)
+
+	print("RANGES:")
+	print(ranges)
+	print(as.data.frame(ranges))
+
+	stem <- plinkExtractRegions(ranges,worker.config$plinkstem)  
+	plink.frq <- plinkFrequencies(stem)
+
+	read.table(plink.frq, head=T)
 })
