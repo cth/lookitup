@@ -384,18 +384,29 @@ shinyServer(function(input, output, session) {
 	output$covariates.tab <- renderUI({ renderCovariatesPanel(input,session) })
 	output$analysis.tab <- renderUI({ renderAnalysisPanel(input,session) })
 
-	output$result.table <- renderDataTable({
+	# FIXME: Memoize loading to avoid double loading
+	output$snp.table <- renderDataTable({
 		result <- data.frame(a=c("default", "option")) 
 		if (!is.null(session$select.analysis) && file.exists(result.file(session$session.key))) {
 			load(result.file(session$session.key))
 		}
-		result
+		result$snp.table
 	})
+
+	output$assoc.table <- renderDataTable({
+		result <- data.frame(a=c("default", "option")) 
+		if (!is.null(session$select.analysis) && file.exists(result.file(session$session.key))) {
+			load(result.file(session$session.key))
+		}
+		result$assoc.table
+	})
+
 
 	output$results.tab <- renderUI({
 		print("Render result.tab:")
 		tabPanels <- list(id="result.tabs") 
-		tabPanels[[length(tabPanels)+1]] <-	tabPanel("Table", dataTableOutput("result.table"))
+		tabPanels[[length(tabPanels)+1]] <-	tabPanel("SNP Table", dataTableOutput("snp.table"))
+		tabPanels[[length(tabPanels)+1]] <-	tabPanel("Association Table", dataTableOutput("assoc.table"))
 		do.call(tabsetPanel,tabPanels)
 	})
 

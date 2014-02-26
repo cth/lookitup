@@ -133,10 +133,11 @@ worker({
 	frq <- plinkFrequencies(stem)
 	hwe <- plinkHardyWeinberg(stem) 
 
-	print(merge(hwe,frq))
 	plink.pheno <- extractSelectPhenotypes(session$phenotypes,phenotypes)
 
-	plinkAssociationAnalysis(plink.pheno,stem)
+	ressult <- list(
+		snp.table = merge(frq,hwe),
+		assoc.table =  plinkAssociationAnalysis(plink.pheno,stem)
+	)	
 
-	#result <- merge(frq,hwe)
 })
