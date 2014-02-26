@@ -25,7 +25,6 @@ plinkExtract <- function(regions, allCohorts, selectedCohorts, phenotypes, plink
 	keep.list.file <- workerTempFile("plink.keep") 
 	write.table(keep.list,keep.list.file,quot=F,row.names=F, col.names=F)
 
-
 	plinkStemOut <- workerTempFile("plink-stem-")
 
 	cmd <- paste("plink --noweb --bfile", plinkStemIn, "--range --extract",  rangesFile, "--keep", keep.list.file, "--make-bed --out", plinkStemOut)
@@ -55,8 +54,53 @@ plinkHardyWeinberg <- function(plinkStemIn) {
 	return(hwe)
 }
 
+extractSelectPhenotypes <- function(session.phenotypes,phenotypes) {
+	print(session.phenotypes)
+	select.phenotypes <- phenotypes[,which(colnames(phenotypes) %in% c("particid",session.phenotypes))]
+	
+	# NOTE: We asssume that the first column of phenotypes is an ID 
+	# that uniquely identifies the individual. Additionally, plink 
+	# needs a family id column 
+	plink.pheno <- data.frame(cbind(select.phenotypes[,1], rep(1,nrow(select.phenotypes)), select.phenotypes[,(2:ncol(select.phenotypes))]))
+	names(plink.pheno) <- c("FID", "IID", names(select.phenotypes)[2:ncol(select.phenotypes)])
+	plink.pheno.file <- workerTempFile("plink.pheno") 
+	write.table(plink.pheno,plink.pheno.file, quot=F, row.names=F, col.names=T) 
+
+	# Test it
+	print(head(read.table(plink.pheno.file, head=T)))
+
+	return(plink.pheno.file)
+}
+
+plinkAssociationAnalysis <- function(plink.phenotypes.file, plinkstem) {
+	assoc.tables <- list()
+
+	plink.phenotypes <- read.table(plink.phenotypes.file,head=T,nrow=1)
+	
+	for (pheno in names(plink.phenotypes)[3:ncol(plink.phenotypes)]) {
+		print(paste("Running PLINK analysis for phenotype", pheno))
+		assoc.file <- workerTempFile("plink.analysis") 
+		plink.cmd <- paste("plink --noweb --bfile", plinkstem, "--pheno", plink.phenotypes.file, "--pheno-name", pheno, "--linear --out", assoc.file)
+		print(plink.cmd)
+		system(plink.cmd)
+		t <- read.table(paste0(assoc.file,".assoc.linear"), head=T,stringsAsFactors=F)
+		if (nrow(t) > 0) {
+			t$phenotype <- rep(pheno, nrow(t))
+			assoc.tables[[length(assoc.tables)+1]] <- t
+		}
+	}
+	assoc.table <- Reduce(rbind,assoc.tables)
+	print(assoc.table)
+	assoc.table <- assoc.table[assoc.table[["TEST"]] == "ADD",]
+
+	print(dim(assoc.table))
+	print(assoc.table)
+
+	return(assoc.table)
+}
+
 worker({
-	# Get worker configuration
+	p# Get worker configuration
 	worker.config <- NULL
 	for(w in config$workers) {
 		if (w$name == "plink analysis") 
@@ -80,7 +124,6 @@ worker({
 	# Restrict to cohorts for which we have phenotype information
 	cohorts <- cohorts[cohorts$id %in% unique(phenotypes$studyid),]
 
-
 	# Get input regions from session
 	lookupIdentifiers <- strsplit(session$input.list,"\n")
 
@@ -91,6 +134,9 @@ worker({
 	hwe <- plinkHardyWeinberg(stem) 
 
 	print(merge(hwe,frq))
+	plink.pheno <- extractSelectPhenotypes(session$phenotypes,phenotypes)
 
-	result <- merge(frq,hwe)
+	plinkAssociationAnalysis(plink.pheno,stem)
+
+	#result <- merge(frq,hwe)
 })
