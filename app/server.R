@@ -20,7 +20,6 @@ phenotypes <- read.table(config$phenotypes,head=T)
 # Restrict to cohorts for which we have phenotype information
 cohorts <- cohorts[cohorts$id %in% unique(phenotypes$studyid),]
 
-
 ## 
 # Step 3: Select cohorts to perfom analysis in
 renderCohortsPanel <- function(input,session) {
@@ -134,6 +133,78 @@ renderAnalysisInput <- function(input,session) {
 		return(displayElems)
 }
 
+renderStratificationPanel <- function(input,session) {
+	# If users has filled in the tab-name input field and pressed "Create", 
+	# go ahead and create.. 
+	if (!is.null(input$newStratTabButton) && input$newStratTabButton != 0 && !is.null(input$newStratTabName) && input$newStratTabName != "") {
+		newStratTab <- tabPanel(input$newStratTabName, renderStratificationProfile(input,session,input$newStratTabName))
+		
+		if (is.null(session$stratificationProfiles)) 
+			session$stratificationProfiles <- list()
+		session$stratificationProfiles[[input$newStratTabName]] <- newStratTab
+	}
+
+
+	if (!is.null(session$stratificationProfiles) && input$newStratTabButton == 0 && !is.null(input$delStratTabButton) && input$delStratTabButton != 0 && !is.null(input$delStratTabSelect)) {
+		tmp.stratificationProfiles <- session$stratificationProfiles
+		if (length(tmp.stratificationProfiles) > 1) {
+			session$stratificationProfiles <- list()
+			keep.profiles <- setdiff(names(tmp.stratificationProfiles),input$delStratTabSelect)
+			for(p in names(tmp.stratificationProfiles)) 
+				if (p %in% keep.profiles)
+					session$stratificationProfiles[[p]] <- tmp.stratificationProfiles[[p]]
+		} else {
+			session$stratificationProfiles <- NULL
+		}
+	}
+
+	tabPanels <- list(
+		tabPanel("Statification Profiles",
+			sidebarPanel(
+				textInput("newStratTabName", "Create stratification profile", ""), 
+				actionButton("newStratTabButton", "Create"),
+				if (!is.null(session$stratificationProfiles))
+					span(
+						selectInput("delStratTabSelect","Remove stratification profile", choices=names(session$stratificationProfiles)),
+						actionButton("delStratTabButton", "Remove"))
+				else
+					span("")
+			)
+		)
+	)
+
+	if (!is.null(session$stratificationProfiles)) {
+		for(tab in names(session$stratificationProfiles))
+			tabPanels[[tab]] <- session$stratificationProfiles[[tab]]
+	}
+
+
+	do.call(tabsetPanel,tabPanels)
+}
+
+renderStratificationProfile <- function(input,session,name) {
+	controls=list()
+
+	for(p in names(phenotypes)) {
+		if(!is.factor( phenotypes[,which(colnames(phenotypes)==p)] )) {
+			values <- phenotypes[,which(colnames(phenotypes)==p)]
+			uniq.values <- setdiff(unique(values),NA)
+
+			# If the phenotype is represented by a few (upto 10) discrete values
+			# then, make choice using checkbox, otherwise assume continuous range
+			# and use a slider for input
+			if (length(uniq.values) <= 10) {
+				controls[[length(controls)+1]] <- wellPanel(checkboxGroupInput(paste("stratification",name,p,sep="."), p, choices=uniq.values,selected=uniq.values))
+			} else {
+				minRange=min(uniq.values,na.rm=T)
+				maxRange=max(uniq.values,na.rm=T)
+				controls[[length(controls)+1]] <- wellPanel(sliderInput(paste0("statification",name,p,sep="."), p,min=minRange,max=maxRange,value=c(minRange,maxRange)))
+			}
+		}
+	}
+	tags$span(controls)
+}
+
 renderAnalysisStatus <- function(input,session) {
 	displayElems = list()
 
@@ -184,9 +255,15 @@ renderSummaryPanel <- function(input,session) {
 }
 
 renderInputPanel <- function(input,session) {
-    output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
-            tags$textarea(id="input.list", rows="20", cols="60", ""))
-	session$input.list <- input$input.list
+	if (!is.null(session$input.list) && is.null(input$input.list)) {
+	    output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
+   	         tags$textarea(id="input.list", rows="20", cols="60", session$input.list)) 
+	} else {
+	    output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
+   	         tags$textarea(id="input.list", rows="20", cols="60", ""))
+	}
+	if (!is.null(input$input.list))
+		session$input.list <- input$input.list
 	print(paste("input.list:", session$input.list))
 	output
 }
@@ -275,7 +352,7 @@ rangeExploratorium <- function(input,session){
     displayPanel <- list()
     rangeChosen <- session$range
 
-    if(session$lookupType != 'try-error'){
+    if(!is.null(session$lookupType) && session$lookupType != 'try-error'){
         #Original session start and end is used in hack
         sessionStart <- as.integer(strsplit((strsplit(session$range,":")[[1]][2]),"-")[[1]][1])
         sessionEnd <- as.integer(strsplit((strsplit(session$range,":")[[1]][2]),"-")[[1]][2])
@@ -324,15 +401,12 @@ rangeExploratorium <- function(input,session){
         }
     }
   
-    if(!is.na(rangeChosen) && session$range != rangeChosen){
+    if(!is.null(rangeChosen) && !is.na(rangeChosen) && session$range != rangeChosen){
         session$range <- rangeChosen
     }
    
     return(displayPanel)
 }
-
-
-
 
 summaryExploratorium <- function(input,session) {
     #Function that looks up session lookup input and report the summary and draws the modify range slider
@@ -353,9 +427,6 @@ summaryExploratorium <- function(input,session) {
     
     return(displayPanel)
 }
-
-
-
 
 # Define server logic
 shinyServer(function(input, output, session) {
@@ -380,6 +451,7 @@ shinyServer(function(input, output, session) {
 	output$input.tab <- renderUI({ renderInputPanel(input,session) })
     output$exploratorium.tab <- renderUI({ renderExploratoriumPanel(input,session) })
 	output$cohorts.tab <- renderUI({ renderCohortsPanel(input,session) })
+	output$stratification.tab <- renderUI({ renderStratificationPanel(input,session) })
 	output$phenotypes.tab <- renderUI({ renderPhenotypePanel(input,session) })
 	output$covariates.tab <- renderUI({ renderCovariatesPanel(input,session) })
 	output$analysis.tab <- renderUI({ renderAnalysisPanel(input,session) })
