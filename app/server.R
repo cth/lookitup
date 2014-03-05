@@ -20,37 +20,74 @@ phenotypes <- read.table(config$phenotypes,head=T)
 # Restrict to cohorts for which we have phenotype information
 cohorts <- cohorts[cohorts$id %in% unique(phenotypes$studyid),]
 
-## 
-# Step 3: Select cohorts to perfom analysis in
 renderCohortsPanel <- function(input,session) {
-	if (is.null(input$cohorts)) {
-		wellPanel(checkboxGroupInput("cohorts", "Select cohorts:",choices=cohorts$name, selected=session$cohorts))
+	if (is.null(session$run.analysis)) {
+		if (is.null(input$cohorts)) {
+			wellPanel(checkboxGroupInput("cohorts", "Select cohorts:",choices=cohorts$name, selected=session$cohorts))
+		} else {
+			wellPanel(checkboxGroupInput("cohorts", "Select cohorts:",choices=cohorts$name, selected=input$cohorts))
+		}
 	} else {
-		wellPanel(checkboxGroupInput("cohorts", "Select cohorts:",choices=cohorts$name, selected=input$cohorts))
+		renderCohortSummary(session)
 	}
 }
 
 
-##
-# Step 4: Select phenotypes relevant for analysis
-renderSelectPhenotypes <- function(select,select.all.none="") {
-	wellPanel(
-		selectInput("phenotypes.all.none", c("","All","None"), choices=c("","all","none"), selected=select.all.none),
-		checkboxGroupInput("phenotypes", "Select phenotypes:", 
-			choices=names(phenotypes),
-			selected=select)
-	)
+renderSelectPhenotypes <- function(input,session,select) {
+	controls <- list(selectInput("phenotypes.all.none", c("","All","None"), choices=c("","all","none")))
+	session$stratificationProfiles <- session$stratificationProfiles
+
+	for(p in names(phenotypes)) {
+		controls[[length(controls)+1]] <-
+			tags$table(cellspacing=5,
+				tags$tr(tags$td(colspan=2, strong(p))), 
+				tags$tr(
+					if (p %in% select)
+						tags$td(checkboxInput(p,"",value=T))
+					else
+						tags$td(checkboxInput(p,"",value=F))
+					,
+					tags$td(selectInput(paste0("transformation.", p),"Transformation", choices=c("none", "rank", "log"), selected="none")),
+					if (!is.null(session$stratificationProfiles)) {
+						tags$td(selectInput(paste0(".", p),"Stratification", choices=c("none", names(session$stratificationProfiles)), selected="none"))
+					} else {
+						tags$td(selectInput(paste0(".", p),"Stratification", choices=c("none"), selected="none"))
+					}
+				))
+	}
+
+	return(controls)
 }
 
 renderPhenotypePanel <- function(input,session) {
-	if (!is.null(input$phenotypes.all.none) && input$phenotypes.all.none == "all") {
-		renderSelectPhenotypes(names(phenotypes))
-	} else if (is.null(input$phenotypes) && is.null(input$phenotypes.all.none)) {
-		renderSelectPhenotypes(session$phenotypes)
-	} else if (!is.null(input$phenotypes.all.none) && input$phenotypes.all.none == "none") {
-		renderSelectPhenotypes(c())
+	print("renderPhenotypePanel")
+	if (is.null(session$run.analysis)) {
+		# Case 1
+		if (is.null(session$phenotypes) && is.null(session$phenotypes.none)) {
+			print("case 1")
+			session$phenotypes <- names(phenotypes) 
+		} 
+		# Case 2
+		if (!is.null(input$phenotypes.all.none) && input$phenotypes.all.none == "all") {
+			print("case 2")
+			session$phenotypes <- names(phenotypes)
+		}
+		# Case 3
+		if (!is.null(input$phenotypes.all.none) && input$phenotypes.all.none == "none") {
+			print("case 3")
+			# This is a hack to avoid returning to case 1 
+			session$phenotypes <- c() 
+			session$phenotypes.none <- T
+		}
+		if (!is.null(input$phenotypes.all.none) && input$phenotypes.all.none == "") {
+			session$phenotypes <- c()
+			for(p in names(phenotypes)) 
+				if(!is.null(input[[p]]) && input[[p]]==T) 
+					session$phenotypes <- c(p,session$phenotypes)
+		}
+		renderSelectPhenotypes(input,session,session$phenotypes)
 	} else {
-		renderSelectPhenotypes(input$phenotypes)
+		renderPhenotypeSummary(session)
 	}
 }
 
@@ -107,6 +144,7 @@ createCovariateMatrix <- function(input,session) {
 ##
 # Step 5: Select covariates
 renderCovariatesPanel <- function(input,session) {
+	if (is.null(session$run.analysis)) {
 		df.covar.matrix <- createCovariateMatrix(input,session) 
 		span(
 			sidebarPanel(
@@ -120,6 +158,9 @@ renderCovariatesPanel <- function(input,session) {
 				renderBooleanDataframe(df.covar.matrix,"covar.matrix","trait")
 			}
 		)
+	} else {
+		renderCovariateSummary(session)
+	}
 }
 
 renderAnalysisInput <- function(input,session) {
@@ -247,25 +288,28 @@ renderSummaryPanel <- function(input,session) {
 		} else {
 			span("")
 		},
-		#renderInputSummary(session),
 		renderCohortSummary(session),
 		renderPhenotypeSummary(session),
-		renderCovariateSummary(input,session)
+		renderCovariateSummary(session)
 	)
 }
 
 renderInputPanel <- function(input,session) {
-	if (!is.null(session$input.list) && is.null(input$input.list)) {
-	    output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
-   	         tags$textarea(id="input.list", rows="20", cols="60", session$input.list)) 
+	if (is.null(session$run.analysis)) {
+		if (!is.null(session$input.list) && is.null(input$input.list)) {
+	    	output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
+   	         	 tags$textarea(id="input.list", rows="20", cols="60", session$input.list)) 
+		} else {
+	    	output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
+   	         	 tags$textarea(id="input.list", rows="20", cols="60", ""))
+		}
+		if (!is.null(input$input.list))
+			session$input.list <- input$input.list
+		print(paste("input.list:", session$input.list))
+		output
 	} else {
-	    output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
-   	         tags$textarea(id="input.list", rows="20", cols="60", ""))
+		renderInputSummary(session)
 	}
-	if (!is.null(input$input.list))
-		session$input.list <- input$input.list
-	print(paste("input.list:", session$input.list))
-	output
 }
 
 
@@ -301,17 +345,14 @@ renderInputSummary <- function(session) {
 }
 renderCohortSummary <- function(session) { itemListSummary(session$cohorts, "Cohorts:") }
 renderPhenotypeSummary <- function(session) { itemListSummary(session$phenotypes, "Phenotypes:") }
-renderCovariateSummary <- function(input,session) { 
-#	span(
-#		itemListSummary(session$covariates, "Covariates:"),
-		covar.matrix <- createCovariateMatrix(input,session)
-		if (is.null(covar.matrix)) {
-			wellPanel(h4("Covariates"), p("none selected"))
-		} else {
-			wellPanel(h4("Covariates"),renderBooleanDataframe(covar.matrix,"covar.summary","trait",F))
-		}
-#	)
-	
+renderCovariateSummary <- function(session) { 
+	# We use list() as placeholder for "empty" input. This is a hack to sure only session is used
+	covar.matrix <- createCovariateMatrix(list(),session)
+	if (is.null(covar.matrix)) {
+		wellPanel(h4("Covariates"), p("none selected"))
+	} else {
+		wellPanel(h4("Covariates"),renderBooleanDataframe(covar.matrix,"covar.summary","trait",F))
+	}
 }
 
 
@@ -349,6 +390,7 @@ drawExploratorium <- function(input,session){
 }
 
 rangeExploratorium <- function(input,session){
+	print("call rangeExploratorium")
     displayPanel <- list()
     rangeChosen <- session$range
 
@@ -363,26 +405,50 @@ rangeExploratorium <- function(input,session){
         
         rangeStart <- as.integer(strsplit((strsplit(rangeChosen,":")[[1]][2]),"-")[[1]][1])
         rangeEnd  <- as.integer(strsplit((strsplit(rangeChosen,":")[[1]][2]),"-")[[1]][2])
-        
-        if(rangeStart-1000>0){
+
+   		if(rangeStart-1000>0){
             rangeStartMinus1000 <- rangeStart-1000
         }else{
             rangeStartMinus1000 <- 0
         }
-
+    
+       
         #Hack to overwrite input if session$range starts or ends outside previous choseable area
         if( (sessionStart <= rangeStartMinus1000 || sessionStart > rangeEnd ) && (sessionEnd > rangeEnd+1000 || sessionEnd < rangeStart) )
         {
+			print("hack 1")
             rangeChosen <- session$range
             rangeStart <- as.integer(strsplit((strsplit(rangeChosen,":")[[1]][2]),"-")[[1]][1])
             rangeEnd  <- as.integer(strsplit((strsplit(rangeChosen,":")[[1]][2]),"-")[[1]][2])
-            
-            if(rangeStart-1000>0){
-                rangeStartMinus1000 <- rangeStart-1000
-            }else{
-                rangeStartMinus1000 <- 0
-            }
+			if(rangeStart-1000>0){
+            	rangeStartMinus1000 <- rangeStart-1000
+        	}else{
+            	rangeStartMinus1000 <- 0
+        	}
         }
+
+		# Hack two: If User changed both ends of slider, then he didn't and it was a bug
+		if ( (sessionStart != rangeStart) && (sessionEnd != rangeEnd) ) {
+			print("hack 2")
+			print(rangeChosen)
+			print(paste(sessionStart,rangeStart,sessionEnd,rangeEnd))
+            rangeChosen <- session$range
+			print(rangeChosen)
+			rangeStart <- as.integer(strsplit((strsplit(rangeChosen,":")[[1]][2]),"-")[[1]][1])
+            rangeEnd  <- as.integer(strsplit((strsplit(rangeChosen,":")[[1]][2]),"-")[[1]][2])
+			if(rangeStart-1000>0){
+            	rangeStartMinus1000 <- rangeStart-1000
+        	}else{
+            	rangeStartMinus1000 <- 0
+        	}
+
+
+		}
+
+
+
+		print(rangeStart)
+		print(rangeEnd)
       
 
         if(rangeStart>rangeEnd){
@@ -402,8 +468,11 @@ rangeExploratorium <- function(input,session){
     }
   
     if(!is.null(rangeChosen) && !is.na(rangeChosen) && session$range != rangeChosen){
+		print("update session range")
         session$range <- rangeChosen
     }
+
+	Sys.sleep(1)
    
     return(displayPanel)
 }
@@ -445,7 +514,7 @@ shinyServer(function(input, output, session) {
 
 	# Initialize session defaults:
 	sessionDefault(session,"cohorts", cohorts$name)
-	sessionDefault(session,"phenotypes", names(phenotypes))
+	#sessionDefault(session,"phenotypes", names(phenotypes))
             
 	# Render tabs   
 	output$input.tab <- renderUI({ renderInputPanel(input,session) })

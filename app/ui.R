@@ -17,10 +17,7 @@ shinyUI(bootstrapPage(
                                      uiOutput("session.key"),
                                      actionButton("restore.session","Refresh session"),
                                      actionButton("save.session", "Duplicate session")),
-								uiOutput("analysis.tab"),
-                                 span(h3("Summary of selections:"),uiOutput("summary.tab")))
-                             ),
-
+								uiOutput("analysis.tab"))),
                     tabPanel("Input", 
 						span(
 					  	  div(class="span4",
@@ -32,6 +29,7 @@ shinyUI(bootstrapPage(
 					  	  div(class="span3",
 							uiOutput("input.tab")))),
                     tabPanel("Cohorts", uiOutput("cohorts.tab")),
+                    tabPanel("Stratification", uiOutput("stratification.tab")),
                     tabPanel("Phenotypes", uiOutput("phenotypes.tab")),
                     tabPanel("Covariates", uiOutput("covariates.tab")),
                     tabPanel("Results", uiOutput("results.tab"))))))
