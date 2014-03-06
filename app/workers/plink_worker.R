@@ -72,7 +72,7 @@ extractSelectPhenotypes <- function(session.phenotypes,phenotypes) {
 	return(plink.pheno.file)
 }
 
-plinkAssociationAnalysis <- function(plink.phenotypes.file, plinkstem) {
+plinkAssociationAnalysis <- function(plink.phenotypes.file,plink.covariates.file, covar, plinkstem) {
 	assoc.tables <- list()
 
 	plink.phenotypes <- read.table(plink.phenotypes.file,head=T,nrow=1)
@@ -80,7 +80,15 @@ plinkAssociationAnalysis <- function(plink.phenotypes.file, plinkstem) {
 	for (pheno in names(plink.phenotypes)[3:ncol(plink.phenotypes)]) {
 		print(paste("Running PLINK analysis for phenotype", pheno))
 		assoc.file <- workerTempFile("plink.analysis") 
-		plink.cmd <- paste("plink --noweb --bfile", plinkstem, "--pheno", plink.phenotypes.file, "--pheno-name", pheno, "--linear --out", assoc.file)
+		print(covar)
+		tmp <- as.vector(as.matrix((covar[which(rownames(covar)==pheno),])))
+		print(tmp)
+		covar.names <- names(covar)[tmp]
+		if (length(covar.names) > 0) {
+			plink.cmd <- paste("plink --noweb --bfile", plinkstem, "--pheno", plink.phenotypes.file, "--pheno-name", pheno, "--covar", plink.covariates.file, "--covar-name", paste(covar.names,sep=","), "--linear --out", assoc.file)
+		} else {
+			plink.cmd <- paste("plink --noweb --bfile", plinkstem, "--pheno", plink.phenotypes.file, "--pheno-name", pheno, "--linear --out", assoc.file)
+		}
 		print(plink.cmd)
 		system(plink.cmd)
 		t <- read.table(paste0(assoc.file,".assoc.linear"), head=T,stringsAsFactors=F)
@@ -134,10 +142,10 @@ worker({
 	hwe <- plinkHardyWeinberg(stem) 
 
 	plink.pheno <- extractSelectPhenotypes(session$phenotypes,phenotypes)
+	plink.covar <- extractSelectPhenotypes(names(session$covariate.matrix),phenotypes)
 
 	ressult <- list(
 		snp.table = merge(frq,hwe),
-		assoc.table =  plinkAssociationAnalysis(plink.pheno,stem)
+		assoc.table =  plinkAssociationAnalysis(plink.pheno,plink.covar,session$covariate.matrix,stem)
 	)	
-
 })

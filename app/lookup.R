@@ -60,7 +60,6 @@ gene.description <- function(input) {
 		}
 }
 
-
 #Lookup logical interpreter
 lookupInterpreter <- function(inputLookup){
     #Function that interpret the user input into three types and always output it as range, summary, name, strand, chr and type
