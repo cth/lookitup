@@ -354,6 +354,21 @@ summaryExploratorium <- function(input,session) {
     return(displayPanel)
 }
 
+getAssocTable <- function(session){
+    result <- data.frame(a=c("default", "option")) 
+    if (!is.null(session$select.analysis) && file.exists(result.file(session$session.key))) {
+        load(result.file(session$session.key))
+    }
+    return(result$assoc.table)
+}
+
+getSNPTable <- function(session){
+    result <- data.frame(a=c("default", "option")) 
+    if (!is.null(session$select.analysis) && file.exists(result.file(session$session.key))) {
+        load(result.file(session$session.key))
+    }
+    return(result$snp.table)
+}
 
 
 
@@ -378,38 +393,43 @@ shinyServer(function(input, output, session) {
             
 	# Render tabs   
 	output$input.tab <- renderUI({ renderInputPanel(input,session) })
-    output$exploratorium.tab <- renderUI({ renderExploratoriumPanel(input,session) })
+        output$exploratorium.tab <- renderUI({ renderExploratoriumPanel(input,session) })
 	output$cohorts.tab <- renderUI({ renderCohortsPanel(input,session) })
 	output$phenotypes.tab <- renderUI({ renderPhenotypePanel(input,session) })
 	output$covariates.tab <- renderUI({ renderCovariatesPanel(input,session) })
 	output$analysis.tab <- renderUI({ renderAnalysisPanel(input,session) })
 
 	# FIXME: Memoize loading to avoid double loading
-	output$snp.table <- renderDataTable({
-		result <- data.frame(a=c("default", "option")) 
-		if (!is.null(session$select.analysis) && file.exists(result.file(session$session.key))) {
-			load(result.file(session$session.key))
-		}
-		result$snp.table
-	})
+	output$snp.table <- renderDataTable({ getSNPTable(session)})
 
-	output$assoc.table <- renderDataTable({
-		result <- data.frame(a=c("default", "option")) 
-		if (!is.null(session$select.analysis) && file.exists(result.file(session$session.key))) {
-			load(result.file(session$session.key))
-		}
-		result$assoc.table
-	})
+        #Load into session then output
+
+	output$assoc.table <- renderDataTable({ getAssocTable(session) })
 
 
 	output$results.tab <- renderUI({
 		print("Render result.tab:")
 		tabPanels <- list(id="result.tabs") 
-		tabPanels[[length(tabPanels)+1]] <-	tabPanel("SNP Table", dataTableOutput("snp.table"))
-		tabPanels[[length(tabPanels)+1]] <-	tabPanel("Association Table", dataTableOutput("assoc.table"))
+		tabPanels[[length(tabPanels)+1]] <- tabPanel("SNP Table", span(dataTableOutput("snp.table"),downloadButton('downloadSNPTable','Download SNP Table')))
+		tabPanels[[length(tabPanels)+1]] <- tabPanel("Association Table", dataTableOutput("assoc.table"),downloadButton('downloadAssocTable','Download Association Table'))
 		do.call(tabsetPanel,tabPanels)
 	})
 
+        output$downloadAssocTable <- downloadHandler(
+            filename = function() { paste0("assoc.table.", Sys.Date(),".csv")},
+            content = function(file){
+                write.csv(getAssocTable(session),file)
+            }
+            )
+        
+        output$downloadSNPTable <- downloadHandler(
+            filename = function() { paste0("SNP.table.", Sys.Date(),".csv")},
+            content = function(file){
+                write.csv(getSNPTable(session),file)
+            }
+            )
+        
+        
 
 	output$summary.tab <- renderUI({
 		# update session with values from input sessionUpdate(session,"cohorts", input$cohorts)
