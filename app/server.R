@@ -38,6 +38,7 @@ renderSelectPhenotypes <- function(input,session,select) {
 	session$stratificationProfiles <- session$stratificationProfiles
 
 	for(p in names(phenotypes)) {
+		strat.pheno <- paste0("stratification.",p) 
 		controls[[length(controls)+1]] <-
 			tags$table(cellspacing=5,
 				tags$tr(tags$td(colspan=2, strong(p))), 
@@ -48,10 +49,10 @@ renderSelectPhenotypes <- function(input,session,select) {
 						tags$td(checkboxInput(p,"",value=F))
 					,
 					tags$td(selectInput(paste0("transformation.", p),"Transformation", choices=c("none", "rank", "log"), selected="none")),
-					if (!is.null(session$stratificationProfiles)) {
-						tags$td(selectInput(paste0(".", p),"Stratification", choices=c("none", names(session$stratificationProfiles)), selected="none"))
+					if (!is.null(session$stratificationProfiles) && !identical(input[[strat.pheno]],names(session$stratificationProfiles))) {
+						tags$td(selectInput(paste0("stratification.", p),"Stratification", choices=c("none", names(session$stratificationProfiles)), selected="none"))
 					} else {
-						tags$td(selectInput(paste0(".", p),"Stratification", choices=c("none"), selected="none"))
+						tags$td(selectInput(paste0("stratification.", p),"Stratification", choices=c("none"), selected="none"))
 					}
 				))
 	}
@@ -81,9 +82,17 @@ renderPhenotypePanel <- function(input,session) {
 		}
 		if (!is.null(input$phenotypes.all.none) && input$phenotypes.all.none == "") {
 			session$phenotypes <- c()
-			for(p in names(phenotypes)) 
+			session$phenotype.stratification <- list() 
+			for(p in names(phenotypes)) {
 				if(!is.null(input[[p]]) && input[[p]]==T) 
 					session$phenotypes <- c(p,session$phenotypes)
+
+				p.strat <- input[[paste0("stratification.", p)]]
+
+				if(!is.null(p.strat) && p.strat != "none") 
+					session$phenotype.stratification[[p]]  <- p.strat
+			}
+
 		}
 		renderSelectPhenotypes(input,session,session$phenotypes)
 	} else {
@@ -175,6 +184,8 @@ renderAnalysisInput <- function(input,session) {
 }
 
 renderStratificationPanel <- function(input,session) {
+	print("renderStratificationPanel")
+
 	# If users has filled in the tab-name input field and pressed "Create", 
 	# go ahead and create.. 
 	if (!is.null(input$newStratTabButton) && input$newStratTabButton != 0 && !is.null(input$newStratTabName) && input$newStratTabName != "") {
@@ -184,7 +195,6 @@ renderStratificationPanel <- function(input,session) {
 			session$stratificationProfiles <- list()
 		session$stratificationProfiles[[input$newStratTabName]] <- newStratTab
 	}
-
 
 	if (!is.null(session$stratificationProfiles) && input$newStratTabButton == 0 && !is.null(input$delStratTabButton) && input$delStratTabButton != 0 && !is.null(input$delStratTabSelect)) {
 		tmp.stratificationProfiles <- session$stratificationProfiles
@@ -202,7 +212,7 @@ renderStratificationPanel <- function(input,session) {
 	tabPanels <- list(
 		tabPanel("Statification Profiles",
 			sidebarPanel(
-				textInput("newStratTabName", "Create stratification profile", ""), 
+				textInput("newStratTabName", "Create stratification profile", ""),
 				actionButton("newStratTabButton", "Create"),
 				if (!is.null(session$stratificationProfiles))
 					span(
@@ -214,9 +224,14 @@ renderStratificationPanel <- function(input,session) {
 		)
 	)
 
+	print("probably goes haywire here")
+
 	if (!is.null(session$stratificationProfiles)) {
 		for(tab in names(session$stratificationProfiles))
-			tabPanels[[tab]] <- session$stratificationProfiles[[tab]]
+			if (is.null(session$stratificationProfiles[[tab]]))
+				tabPanels[[tab]] <- tabPanel(input$newStratTabName, renderStratificationProfile(input,session,input$newStratTabName))
+			else
+				tabPanels[[tab]] <- session$stratificationProfiles[[tab]] 
 	}
 
 
@@ -225,6 +240,7 @@ renderStratificationPanel <- function(input,session) {
 
 renderStratificationProfile <- function(input,session,name) {
 	controls=list()
+	print(paste0("renderStraticitionProfile:", name))
 
 	for(p in names(phenotypes)) {
 		if(!is.factor( phenotypes[,which(colnames(phenotypes)==p)] )) {
@@ -234,16 +250,53 @@ renderStratificationProfile <- function(input,session,name) {
 			# If the phenotype is represented by a few (upto 10) discrete values
 			# then, make choice using checkbox, otherwise assume continuous range
 			# and use a slider for input
+			input.key <- paste("stratification",name,p,sep=".")
 			if (length(uniq.values) <= 10) {
-				controls[[length(controls)+1]] <- wellPanel(checkboxGroupInput(paste("stratification",name,p,sep="."), p, choices=uniq.values,selected=uniq.values))
+				controls[[length(controls)+1]] <- wellPanel(checkboxGroupInput(input.key, p, choices=uniq.values,selected=uniq.values))
 			} else {
 				minRange=min(uniq.values,na.rm=T)
 				maxRange=max(uniq.values,na.rm=T)
-				controls[[length(controls)+1]] <- wellPanel(sliderInput(paste0("statification",name,p,sep="."), p,min=minRange,max=maxRange,value=c(minRange,maxRange)))
+				if (!is.null(session[[input.key]])) {
+					print(paste("session ->",session[[input.key]]))
+					select.choices <- session[[input.key]]
+				} else {
+					select.choices <- c(minRange,maxRange)
+				}
+				print(input.key)
+				controls[[length(controls)+1]] <- wellPanel(sliderInput(input.key, p,min=minRange,max=maxRange,value=select.choices))
 			}
 		}
 	}
 	tags$span(controls)
+}
+
+saveStratificationProfiles <- function(input,session) {
+	for (tab in names(session$stratificationProfiles))
+		session$stratificationProfiles[[tab]] <- tabPanel(tab, renderStratificationProfile(input,session,tab))
+
+	if (!is.null(session$stratificationProfiles)) {
+		for (profile in names(session$stratificationProfiles)) {
+			for(pheno in names(phenotypes)) {
+				if(!is.factor( phenotypes[,which(colnames(phenotypes)==pheno)] )) {
+					values <- phenotypes[,which(colnames(phenotypes)==pheno)]
+					uniq.values <- setdiff(unique(values),NA)
+					minRange=min(uniq.values,na.rm=T)
+					maxRange=max(uniq.values,na.rm=T)
+					# Determine if we should extract value from slider or from 
+					input.key <- paste("stratification",profile,pheno,sep=".")
+					if (!is.null(input[[input.key]])) {
+						session[[input.key]] <- input[[input.key]]
+						print(paste("Saving", input.key, input[[input.key]]))
+					}
+				}
+			}
+		}
+	}
+	if (!is.null(session$stratificationProfiles)) {
+		for(tab in names(session$stratificationProfiles))
+			session$stratificationProfiles[[tab]] <- NULL
+	}
+
 }
 
 renderAnalysisStatus <- function(input,session) {
@@ -272,6 +325,7 @@ renderAnalysisPanel <- function(input,session) {
 		session$run.analysis <- input$run.analysis
 		session$select.analysis <- input$select.analysis
 		print(paste0("Saving session before analyses: ",session$session.key))
+		saveStratificationProfiles(input,session)
 		save(session,file=session.file(session$session.key))
 		write(c(), file=run.file(session$session.key))
 		displayElems <- renderAnalysisStatus(input,session)
@@ -445,8 +499,6 @@ rangeExploratorium <- function(input,session){
 
 		}
 
-
-
 		print(rangeStart)
 		print(rangeEnd)
       
@@ -559,13 +611,13 @@ shinyServer(function(input, output, session) {
 
 	# Produce session.key and save session as side-effect
 	output$session.key <- renderUI({
-
 		if (!is.null(input$save.session) && input$save.session > 0 && !identical(input$save.session,session$save.session)) {
 
-			# Make sure that any running analyses are not carried over to new session
 			# update session with values from input
 			sessionUpdate(session,"cohorts", input$cohorts)
 			sessionUpdate(session,"phenotypes", input$phenotypes)
+
+			saveStratificationProfiles(input,session)
 			
 			# Make sure that any running analyses are not carried over to new session
 			session$run.analysis <- NULL
