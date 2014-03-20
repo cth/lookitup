@@ -230,13 +230,15 @@ renderStratificationPanel <- function(input,session) {
 		}
 		for(tab in names(session$stratificationProfiles)) {
 			print(paste("tab", tab))
+			print(session$reloadStratificationProfile)
 			if (!is.null(session$reloadStratificationProfile[[tab]]) && session$reloadStratificationProfile[[tab]]) {
 				print("rendering..")
 				tabPanels[[tab]] <- tabPanel(tab, renderStratificationProfile(input,session,tab))
-				session$reloadStratificationProfile[[tab]] <- F 
-			} else {
-				tabPanels[[tab]] <- session$stratificationProfiles[[tab]] 
-				session$reloadStratificationProfile[[tab]] <- F	
+				#session$reloadStratificationProfile[[tab]] <- F 
+#			} else {
+#				print("here")
+#				tabPanels[[tab]] <- session$stratificationProfiles[[tab]] 
+#				session$reloadStratificationProfile[[tab]] <- F	
 			}
 		}
 	}
@@ -311,8 +313,8 @@ saveStratificationProfiles <- function(input,session) {
 	if (!is.null(session$stratificationProfiles)) {
 		for(tab in names(session$stratificationProfiles)) {
 			session$reloadStratificationProfile[[tab]] <- T 
+			session$stratificationProfiles[[tab]] <- tabPanel(tab,"") 
 		}
-		#session$stratificationProfiles <- NULL
 	}
 
 }
