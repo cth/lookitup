@@ -224,15 +224,24 @@ renderStratificationPanel <- function(input,session) {
 		)
 	)
 
-	print("probably goes haywire here")
-
 	if (!is.null(session$stratificationProfiles)) {
-		for(tab in names(session$stratificationProfiles))
-			if (is.null(session$stratificationProfiles[[tab]]))
-				tabPanels[[tab]] <- tabPanel(input$newStratTabName, renderStratificationProfile(input,session,input$newStratTabName))
-			else
+		if (is.null( session$reloadStratificationProfile )) {
+			session$reloadStratificationProfile <- list()
+		}
+		for(tab in names(session$stratificationProfiles)) {
+			print(paste("tab", tab))
+			if (!is.null(session$reloadStratificationProfile[[tab]]) && session$reloadStratificationProfile[[tab]]) {
+				print("rendering..")
+				tabPanels[[tab]] <- tabPanel(tab, renderStratificationProfile(input,session,tab))
+				session$reloadStratificationProfile[[tab]] <- F 
+			} else {
 				tabPanels[[tab]] <- session$stratificationProfiles[[tab]] 
+				session$reloadStratificationProfile[[tab]] <- F	
+			}
+		}
 	}
+
+	print(session$reloadStratificationProfile)
 
 
 	do.call(tabsetPanel,tabPanels)
@@ -251,6 +260,7 @@ renderStratificationProfile <- function(input,session,name) {
 			# then, make choice using checkbox, otherwise assume continuous range
 			# and use a slider for input
 			input.key <- paste("stratification",name,p,sep=".")
+			print(input.key)
 			if (length(uniq.values) <= 10) {
 				controls[[length(controls)+1]] <- wellPanel(checkboxGroupInput(input.key, p, choices=uniq.values,selected=uniq.values))
 			} else {
@@ -258,11 +268,17 @@ renderStratificationProfile <- function(input,session,name) {
 				maxRange=max(uniq.values,na.rm=T)
 				if (!is.null(session[[input.key]])) {
 					print(paste("session ->",session[[input.key]]))
+					print(paste("default ->", c(minRange,maxRange)))
 					select.choices <- session[[input.key]]
+					select.choices <- sort(select.choices)
+					if (select.choices[1] < minRange)
+						select.choices[1] <- minRange
+					if (select.choices[2] > maxRange)
+						select.choices[2] <- maxRange
+					print(paste("select ->",session[[input.key]]))
 				} else {
 					select.choices <- c(minRange,maxRange)
 				}
-				print(input.key)
 				controls[[length(controls)+1]] <- wellPanel(sliderInput(input.key, p,min=minRange,max=maxRange,value=select.choices))
 			}
 		}
@@ -293,8 +309,10 @@ saveStratificationProfiles <- function(input,session) {
 		}
 	}
 	if (!is.null(session$stratificationProfiles)) {
-		for(tab in names(session$stratificationProfiles))
-			session$stratificationProfiles[[tab]] <- NULL
+		for(tab in names(session$stratificationProfiles)) {
+			session$reloadStratificationProfile[[tab]] <- T 
+		}
+		#session$stratificationProfiles <- NULL
 	}
 
 }
