@@ -370,17 +370,31 @@ renderSummaryPanel <- function(input,session) {
 
 renderInputPanel <- function(input,session) {
 	if (is.null(session$run.analysis)) {
-		if (!is.null(session$input.list) && is.null(input$input.list)) {
+            if(is.null(input$input.list)){
 	    	output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
-   	         	 tags$textarea(id="input.list", rows="20", cols="60", session$input.list)) 
-		} else {
-	    	output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
-   	         	 tags$textarea(id="input.list", rows="20", cols="60", ""))
-		}
-		if (!is.null(input$input.list))
-			session$input.list <- input$input.list
-		print(paste("input.list:", session$input.list))
-		output
+                        tags$textarea(id="input.list", rows="20", cols="60", session$input.list)) 
+            }
+            else{
+                output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
+                        tags$textarea(id="input.list", rows="20", cols="60", input$input.list))                
+            }
+#            if ((!is.null(session$input.list) && !is.null(input$input.list)) && input$input.list==session$input.list) {
+#	    	output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
+ #  	         	 tags$textarea(id="input.list", rows="20", cols="60", session$input.list)) 
+#		}else if(is.null(input$input.list)){
+#	    	output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
+ #  	         	 tags$textarea(id="input.list", rows="20", cols="60", ""))
+#		}else{
+ #                   output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
+  #                          tags$textarea(id="input.list", rows="20", cols="60", input$input.list))
+   #                 if (!is.null(input$input.list) && (!is.null(session$input.list) && session$input.list!=input$input.list)){
+    #                    session$input.list <- input$input.list
+     #               }
+#                }
+#		print(paste("session.list:", session$input.list))
+ #               print(paste("input.list:", input$input.list))
+            session$input.list <- input$input.list
+            output
 	} else {
 		renderInputSummary(session)
 	}
