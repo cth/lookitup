@@ -2,7 +2,7 @@ source("worker.common.R")
 source("lookup.R")
 
 GenomicRangesToPlinkRangeFile <- function(ranges,file) {
-	df <- as.data.frame(ranges) 
+	df <- as.data.frame(ranges)
 	fields <- sapply(c("seqnames", "start", "end", "name"),function(x) { which(names(df)==x) })
 	print(fields)
 	write.table(df[,fields],file=file, quot=F, row.names=F, col.names=F,sep="\t")
@@ -12,9 +12,9 @@ GenomicRangesToPlinkRangeFile <- function(ranges,file) {
 # Extract selected input regions and individuals corresponding to selected cohorts from plink file
 plinkExtract <- function(regions, allCohorts, selectedCohorts, phenotypes, plinkStemIn) {
 	# FIXME: use random/unique filename
-	rangesFile <- workerTempFile("plink-ranges") 
+	rangesFile <- workerTempFile("plink-ranges-") 
 	print("----")
-	system(paste("cat", rangesFile))
+#	system(paste("cat", rangesFile))
 	GenomicRangesToPlinkRangeFile(regions,rangesFile)
 
 	studyids <- allCohorts[selectedCohorts %in% allCohorts$name,1]
@@ -22,7 +22,7 @@ plinkExtract <- function(regions, allCohorts, selectedCohorts, phenotypes, plink
 	particids <- phenotypes[phenotypes$studyid %in% studyids, 1] 
 	#print(paste0("particids:", particids))
 	keep.list <- data.frame(pid=particids, fid=rep(1, length(particids)))
-	keep.list.file <- workerTempFile("plink.keep") 
+	keep.list.file <- workerTempFile("plink-keep-") 
 	write.table(keep.list,keep.list.file,quot=F,row.names=F, col.names=F)
 
 	plinkStemOut <- workerTempFile("plink-stem-")
@@ -79,11 +79,17 @@ plinkAssociationAnalysis <- function(plink.phenotypes.file,plink.covariates.file
 	
 	for (pheno in names(plink.phenotypes)[3:ncol(plink.phenotypes)]) {
 		print(paste("Running PLINK analysis for phenotype", pheno))
-		assoc.file <- workerTempFile("plink.analysis") 
-		print(covar)
-		tmp <- as.vector(as.matrix((covar[which(rownames(covar)==pheno),])))
-		print(tmp)
-		covar.names <- names(covar)[tmp]
+		assoc.file <- workerTempFile("plink.analysis")
+
+                if(!is.null(plink.covariates.file)){             
+                    print(covar)
+                    tmp <- as.vector(as.matrix((covar[which(rownames(covar)==pheno),])))
+                    print(tmp)
+                    covar.names <- names(covar)[tmp]
+                }
+                else{
+                    covar.names <- c()
+                }
 		if (length(covar.names) > 0) {
 			plink.cmd <- paste("plink --noweb --bfile", plinkstem, "--pheno", plink.phenotypes.file, "--pheno-name", pheno, "--covar", plink.covariates.file, "--covar-name", paste(covar.names,sep=","), "--linear --out", assoc.file)
 		} else {
@@ -108,13 +114,13 @@ plinkAssociationAnalysis <- function(plink.phenotypes.file,plink.covariates.file
 }
 
 worker({
-	p# Get worker configuration
+	# Get worker configuration
 	worker.config <- NULL
 	for(w in config$workers) {
-		if (w$name == "plink analysis") 
+		if (w$name == session$select.analysis) 
 			worker.config <- w
 	}
-
+        
 	print(worker.config)
 	print(paste("SESSION: ", session$session.key))
 
@@ -136,14 +142,18 @@ worker({
 	lookupIdentifiers <- strsplit(session$input.list,"\n")
 
 	ranges <- rangesFromInputList(lookupIdentifiers)
-
-	stem <- plinkExtract(ranges,cohorts,session$cohorts,phenotypes,worker.config$plinkstem)  
+        stem <- plinkExtract(ranges,cohorts,session$cohorts,phenotypes,worker.config$plinkstem)  
 	frq <- plinkFrequencies(stem)
-	hwe <- plinkHardyWeinberg(stem) 
-
+	hwe <- plinkHardyWeinberg(stem)
+        
 	plink.pheno <- extractSelectPhenotypes(session$phenotypes,phenotypes)
-	plink.covar <- extractSelectPhenotypes(names(session$covariate.matrix),phenotypes)
-
+        if(!is.null(session$covariate.matrix)){
+            plink.covar <- extractSelectPhenotypes(names(session$covariate.matrix),phenotypes)
+        }
+        else{
+            plink.covar <- NULL
+        }
+            
 	ressult <- list(
 		snp.table = merge(frq,hwe),
 		assoc.table =  plinkAssociationAnalysis(plink.pheno,plink.covar,session$covariate.matrix,stem)

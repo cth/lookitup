@@ -105,7 +105,6 @@ genomicRangeParser <- function(rangeExpr,name="") {
 	if (grepl("chr([0-9]+):([1-9]+[0-9]*)(-([1-9]+[0-9]*))?",rangeExpr)) {
 		r <- regexec("chr([0-9]+):([1-9]+[0-9]*)(-([1-9]+[0-9]*))?", rangeExpr)
 		matches <- regmatches(rangeExpr,r)
-
 		print(matches)
 				
 		if (matches[[1]][[5]] == "") { # Singular range
@@ -121,7 +120,7 @@ genomicRangeParser <- function(rangeExpr,name="") {
 }
 
 rangesFromInputList <- function(inputs,reduce.ranges=F) {
-	lookupObjs <- lapply(inputs,lookupInterpreter)
+	lookupObjs <- lapply(inputs[[1]],lookupInterpreter)
 	ranges <- sapply(lookupObjs, function(x) { genomicRangeParser(x$range,x$name) }) 
 	oneGR <- Reduce(c,sapply(ranges, function(x) { x }))
 	if (reduce.ranges) 

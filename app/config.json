@@ -8,33 +8,28 @@
 		{ 
 			"name":"plink analysis metaboChip", 
 			"script" : "workers/plink_worker.R",
-			"extension" : "plink",
 		        "plinkstem" : "/eva/rawdata/remapped_to_hg38_data/metaboChip/metaboChipAll_hg37_then_hg38_mapped",
 			"tmpdir" : "/tmp"
 		},
 		{ 
 			"name":"plink analysis exomChip", 
 			"script" : "workers/plink_worker.R",
-			"extension" : "plink",
 		        "plinkstem" : "/eva/rawdata/remapped_to_hg38_data/exomChip/exomChipAllHg38Remapped",
 			"tmpdir" : "/tmp"
 		},
 		{ 
 			"name":"plink analysis deepExom", 
 			"script" : "workers/plink_worker.R",
-			"extension" : "plink",
 		        "plinkstem" : "/eva/rawdata/remapped_to_hg38_data/deepExom/deepExom_hg38_mapped_burden5_lrt24qibin7R2BeagleV2",
 			"tmpdir" : "/tmp"
 		},
 		{ 
 			"name": "Annotation analysis", 
-			"script": "workers/annotate.R",
-			"extension": "annotate"
+			"script": "workers/annotate.R"
 		},
 		{
 			"name": "Test stub",
-			"script": "workers/test_stub_worker.R",
-			"extension": "test"
+			"script": "workers/test_stub_worker.R"
 		}
 
 	],
