@@ -22,10 +22,10 @@ shinyUI(bootstrapPage(
 						span(
 					  	  div(class="span4",
 					    	tags$form(class="well",
+					        uiOutput("exploratorium.tab"),
 					        actionButton("lookupButton","Lookup"),
 					        actionButton("add.input","Add"),
-					        uiOutput("exploratorium.tab"),
-					        actionButton("addRangeButton","Add Range"))),
+                                                actionButton("addRangeButton","Add Modified Range"))),
 					  	  div(class="span3",
 							uiOutput("input.tab")))),
                     tabPanel("Cohorts", uiOutput("cohorts.tab")),
