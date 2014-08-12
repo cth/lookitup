@@ -371,28 +371,13 @@ renderSummaryPanel <- function(input,session) {
 renderInputPanel <- function(input,session) {
 	if (is.null(session$run.analysis)) {
             if(is.null(input$input.list)){
-	    	output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
+	    	output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line) - copy-paste a list into here, otherwise use the Exploratorium to the left"),
                         tags$textarea(id="input.list", rows="20", cols="60", session$input.list)) 
             }
             else{
-                output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
+                output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line) - copy-paste a list into here, otherwise use the Exploratorium to the left"),
                         tags$textarea(id="input.list", rows="20", cols="60", input$input.list))                
             }
-#            if ((!is.null(session$input.list) && !is.null(input$input.list)) && input$input.list==session$input.list) {
-#	    	output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
- #  	         	 tags$textarea(id="input.list", rows="20", cols="60", session$input.list)) 
-#		}else if(is.null(input$input.list)){
-#	    	output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
- #  	         	 tags$textarea(id="input.list", rows="20", cols="60", ""))
-#		}else{
- #                   output<-span(h6("List of genes, SNPs (rsnumbers) and genomic ranges to by analysed (one per line)"),
-  #                          tags$textarea(id="input.list", rows="20", cols="60", input$input.list))
-   #                 if (!is.null(input$input.list) && (!is.null(session$input.list) && session$input.list!=input$input.list)){
-    #                    session$input.list <- input$input.list
-     #               }
-#                }
-#		print(paste("session.list:", session$input.list))
- #               print(paste("input.list:", input$input.list))
             session$input.list <- input$input.list
             output
 	} else {
@@ -426,8 +411,8 @@ itemListSummary <- function(items,caption) {
 renderInputSummary <- function(session) { 
 	if (!is.null(session$input.list)) {
 		print("rendering new summary")
-		strsplit(session$input.list,"\n")[[1]]
-		itemListSummary(, "Analysis regions:") 
+		inputted.items <- strsplit(session$input.list,"\n")[[1]]
+		itemListSummary(inputted.items,"Analysis regions:") 
 	} else
 		span()
 }
@@ -445,24 +430,28 @@ renderCovariateSummary <- function(session) {
 
 
 renderExploratoriumPanel <- function(input,session){
-    #Function that calls the right draw functions at the right time
-    if(!is.null(session$lookupButton) && session$lookupButton!=input$lookupButton){
-        #update session if it different from input (button is pressed). Update session input and button
-        session$lookup <- input$lookup
-        session$lookupButton <- input$lookupButton
-        session$ExploratoriumSummaryPanel <- summaryExploratorium(input,session)
-    }
-    #Draw the session summary and a new search field if button have been pressed and updated
-    if(!is.null(session$lookupButton) && session$lookupButton==input$lookupButton){
-        session$ExploratoriumRangePanel <- rangeExploratorium(input,session)
-        displayPanel <- list(drawExploratorium(input,session),session$ExploratoriumRangePanel,session$ExploratoriumSummaryPanel)
-    }else{
-    #Draw the search field without a summary and update session button
-        session$lookupButton <- input$lookupButton
-        displayPanel <- drawExploratorium(input,session)
-    }
+    if (is.null(session$run.analysis)) {
+        #Function that calls the right draw functions at the right time
+        if((!is.null(session$lookupButton) && session$lookupButton!=input$lookupButton) && !is.null(input$lookup)){
+            #update session if it different from input (button is pressed). Update session input and button            
+            session$lookup <- input$lookup
+            session$lookupButton <- input$lookupButton
+            session$ExploratoriumSummaryPanel <- summaryExploratorium(input,session)
+        }
+           #Draw the session summary and a new search field if button have been pressed and updated
+        if(!is.null(session$lookupButton) && session$lookupButton==input$lookupButton){
+            session$ExploratoriumRangePanel <- rangeExploratorium(input,session)
+            displayPanel <- list(drawExploratorium(input,session),session$ExploratoriumRangePanel,session$ExploratoriumSummaryPanel)
+        }else{
+            #Draw the search field without a summary and update session button
+            session$lookupButton <- input$lookupButton
+            displayPanel <- drawExploratorium(input,session)
+        }
         
-    return(displayPanel)
+        return(displayPanel)
+    }else{
+        span()
+    }
 }
 
 
@@ -470,6 +459,7 @@ drawExploratorium <- function(input,session){
     #Function that draws the search field for lookup
     displayPanel <- list(
         mainPanel(
+            h4("Exploratorium"),
             textInput("lookup","Search:"),
             helpText(list("Submit a lookup in one of three formats:",tags$ul(tags$li("Range: chr1:12345-67890"),tags$li("SNP-name: rs1234567890"), tags$li("Gene-name: GENE"))))
             )
@@ -478,7 +468,7 @@ drawExploratorium <- function(input,session){
 }
 
 rangeExploratorium <- function(input,session){
-	print("call rangeExploratorium")
+    print("call rangeExploratorium")
     displayPanel <- list()
     rangeChosen <- session$range
 
@@ -565,6 +555,9 @@ rangeExploratorium <- function(input,session){
 
 summaryExploratorium <- function(input,session) {
     #Function that looks up session lookup input and report the summary and draws the modify range slider
+
+#when session is duplicated and reloaded this section fails. sesssion$lookup is NULL
+    
     lookupTranslated <- lookupInterpreter(session$lookup)
     session$range <- lookupTranslated$range
     session$lookupType <- lookupTranslated$type
